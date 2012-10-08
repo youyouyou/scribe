@@ -200,6 +200,7 @@ FileStoreBase::FileStoreBase(StoreQueue* storeq,
     createSymlink(true),
     writeStats(false),
     rotateOnReopen(false),
+    rotateIfData(false),
     currentSize(0),
     lastRollTime(0),
     eventsWritten(0) {
@@ -331,6 +332,12 @@ void FileStoreBase::configure(pStoreConf configuration, pStoreConf parent) {
       rotateOnReopen = false;
     }
   }
+
+  if (configuration->getString("rotate_if_data", tmp)) {
+    if (0 == tmp.compare("yes")) {
+      rotateIfData = true;
+    }
+  }
 }
 
 void FileStoreBase::copyCommon(const FileStoreBase *base) {
@@ -350,6 +357,7 @@ void FileStoreBase::copyCommon(const FileStoreBase *base) {
   baseSymlinkName = base->baseSymlinkName;
   writeStats = base->writeStats;
   rotateOnReopen = base->rotateOnReopen;
+  rotateIfData = base->rotateIfData;
 
   /*
    * append the category name to the base file path and change the
@@ -394,6 +402,10 @@ void FileStoreBase::periodicCheck() {
         break;
       case ROLL_NEVER:
         break;
+    }
+    // Do periodic roll up only if you have some messages	
+    if (rotate) {
+    rotate = rotateIfData ? (currentSize > 0) : rotate;
     }
   }
 
