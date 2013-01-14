@@ -122,6 +122,7 @@ Store::Store(StoreQueue* storeq,
   : categoryHandled(category),
     multiCategory(multi_category),
     storeType(type),
+    isPrimary(false),
     storeQueue(storeq) {
   pthread_mutex_init(&statusMutex, NULL);
 }
@@ -146,6 +147,16 @@ std::string Store::getStatus() {
   std::string return_status(status);
   pthread_mutex_unlock(&statusMutex);
   return return_status;
+}
+
+void Store::auditMessageSent(const scribe::thrift::LogEntry& entry) {
+  // skip auditing if it is not a primary store, or if the current store queue
+  // is for audit category
+  if (!isPrimary || categoryHandled.compare("audit") == 0 || !storeQueue->getAuditStore()) {
+    return;
+  }
+
+  storeQueue->auditMessage(entry, false);
 }
 
 bool Store::readOldest(/*out*/ boost::shared_ptr<logentry_vector_t> messages,
@@ -891,7 +902,16 @@ bool FileStore::writeMessages(boost::shared_ptr<logentry_vector_t> messages,
       // Write buffer if processing last message or if larger than allowed
       if ((current_size_buffered > max_write_size && maxSize != 0) ||
           messages->end() == iter + 1 ) {
-        if (!write_file->write(write_buffer)) {
+        bool status = write_file->write(write_buffer);
+        if (status) {
+          // if write succeeded, audit these messages if it is a primary store
+          if (isPrimary && (categoryHandled.compare("audit") != 0) && 
+              storeQueue->getAuditStore()) {
+            for (unsigned long index = num_written; index < num_written + num_buffered; index++) {
+              storeQueue->auditMessage(*(messages->at(index)), false);
+            }
+          }
+        } else {
           LOG_OPER("[%s] File store failed to write (%lu) messages to file",
                    categoryHandled.c_str(), messages->size());
           setStatus("File write error");
@@ -1411,6 +1431,9 @@ void BufferStore::configure(pStoreConf configuration, pStoreConf parent) {
       primaryStore = createStore(storeQueue, type, categoryHandled, false,
                                   multiCategory);
       primaryStore->configure(primary_store_conf, storeConf);
+      // set the primary flag for this store to true. This will be used later
+      // to decide whether to audit the sent messages. 
+      primaryStore->setStorePrimary();
     }
   }
 

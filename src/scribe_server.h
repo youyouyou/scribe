@@ -100,6 +100,7 @@ class scribeHandler : virtual public scribe::thrift::scribeIf,
   unsigned long long maxQueueSize;
   StoreConf config;
   bool newThreadPerCategory;
+  boost::shared_ptr<StoreQueue> auditStore;
 
   /* mutex to syncronize access to scribeHandler.
    * A single mutex is fine since it only needs to be locked in write mode
@@ -131,6 +132,8 @@ class scribeHandler : virtual public scribe::thrift::scribeIf,
     createNewCategory(const std::string& category);
   void addMessage(const scribe::thrift::LogEntry& entry,
                   const boost::shared_ptr<store_list_t>& store_list);
+  void auditMessageReceived(const scribe::thrift::LogEntry& entry);
+  void configureAuditStoreToStores();
 };
 extern boost::shared_ptr<scribeHandler> g_Handler;
 #endif // SCRIBE_SERVER_H

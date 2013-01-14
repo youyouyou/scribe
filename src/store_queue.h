@@ -1,5 +1,5 @@
 //  Copyright (c) 2007-2008 Facebook
-//
+
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
 //  You may obtain a copy of the License at
@@ -25,6 +25,10 @@
 #define SCRIBE_STORE_QUEUE_H
 
 #include "common.h"
+#include "src/gen-cpp/audit_types.h"
+
+typedef audit::thrift::AuditMessage audit_msg_t;
+typedef std::map<std::string, boost::shared_ptr<audit_msg_t> > audit_map_t;
 
 class Store;
 
@@ -60,11 +64,25 @@ class StoreQueue {
   inline unsigned long long getSize() {
     return msgQueueSize;
   }
+
+  // this method allows various threads to audit a message when it is received/sent 
+  void auditMessage(const scribe::thrift::LogEntry& entry, bool received);
+  // set the audit store. This should be called only if audit category is configured.
+  void setAuditStore(boost::shared_ptr<StoreQueue> pAudit) { auditStore = pAudit; }
+  boost::shared_ptr<StoreQueue> getAuditStore() { return auditStore; } 
+
  private:
   void storeInitCommon();
   void configureInline(pStoreConf configuration);
   void openInline();
   void processFailedMessages(boost::shared_ptr<logentry_vector_t> messages);
+  
+  // method to find out the timestamp key for a given entry
+  unsigned long long getTimestampKeyFromMessage(const scribe::thrift::LogEntry& entry);
+  unsigned long long byteArrayToLong(const char* buf);
+  // this method is called by audit store thread to periodically generate audit messages
+  // for all categories and add them to message queue. 
+  void performAuditTask();
 
   // implementation of queues and thread
   enum store_command_t {
@@ -113,6 +131,12 @@ class StoreQueue {
   unsigned long long targetWriteSize;  // in bytes
   time_t             maxWriteInterval; // in seconds
   bool               mustSucceed;      // Always retry even if secondary fails
+
+  // audit configuration
+  bool isAuditStore;
+  boost::shared_ptr<StoreQueue> auditStore;
+  audit_map_t auditMap;  
+  boost::shared_ptr<apache::thrift::concurrency::ReadWriteMutex> auditRWMutex;
 
   // Store that will handle messages. This can contain other stores.
   boost::shared_ptr<Store> store;

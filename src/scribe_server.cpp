@@ -290,6 +290,11 @@ bool scribeHandler::createCategoryFromModel(
   }
   pstores->push_back(pstore);
 
+  if (auditStore != NULL) {
+    pstore->setAuditStore(auditStore);
+    LOG_OPER("configured audit store for category [%s]", category.c_str());
+  }
+
   return true;
 }
 
@@ -414,6 +419,13 @@ void scribeHandler::addMessage(
   }
 }
 
+void scribeHandler::auditMessageReceived(const LogEntry& entry) {
+  // if audit store is configured and the message category is not audit,
+  // then audit this message as received
+  if (auditStore && (entry.category.compare("audit") != 0)) {
+    auditStore->auditMessage(entry, true);
+  }
+}
 
 ResultCode scribeHandler::Log(const vector<LogEntry>&  messages) {
   ResultCode result = TRY_LATER;
@@ -476,6 +488,9 @@ ResultCode scribeHandler::Log(const vector<LogEntry>&  messages) {
       continue;
     }
 
+    // audit this message as received
+    auditMessageReceived(*msg_iter);
+    
     // Log this message
     addMessage(*msg_iter, store_list);
   }
@@ -651,6 +666,11 @@ void scribeHandler::initialize() {
 
   if (numstores) {
     LOG_OPER("configured <%d> stores", numstores);
+
+    // if audit store is configured, pass audit store to other stores
+    if (auditStore != NULL) {
+      configureAuditStoreToStores(); 
+   }
   } else {
     setStatusDetails("No stores configured successfully");
     perfect_config = false;
@@ -674,6 +694,26 @@ void scribeHandler::initialize() {
   }
 }
 
+void scribeHandler::configureAuditStoreToStores() {
+  int storeCount = 0;
+  // Note that we are currently setting audit store to only the stores within categories map.
+  // TODO: Do we need to set audit store to stores within category_prefixes and defaultStores?
+  category_map_t::iterator cat_iter;
+  store_list_t::iterator store_iter; 
+  for (cat_iter = categories.begin(); cat_iter != categories.end(); cat_iter++) { 
+    // skip if the map entry is for audit store itself 
+    if (cat_iter->first.compare("audit") == 0) {
+      continue;
+    }
+    
+    boost::shared_ptr<store_list_t> pstores = cat_iter->second;
+    for (store_iter = pstores->begin(); store_iter != pstores->end(); store_iter++) { 
+      (*store_iter)->setAuditStore(auditStore);
+      storeCount++;
+    }
+  }
+  LOG_OPER("configured audit store in <%d> stores", storeCount);
+}
 
 // Configures the store specified by the store configuration. Returns false if failed.
 bool scribeHandler::configureStore(pStoreConf store_conf, int *numstores) {
@@ -872,6 +912,11 @@ shared_ptr<StoreQueue> scribeHandler::configureStoreCategory(
       categories[category] = pstores;
     }
     pstores->push_back(pstore);
+  }
+
+  // check if the category is 'audit'
+  if (0 == category.compare("audit")) {
+    auditStore = pstore;
   }
 
   return pstore;

@@ -86,12 +86,19 @@ class Store {
   // don't need to override
   virtual const std::string& getType();
 
+  void setStorePrimary() { isPrimary = true; } 
+  bool isStorePrimary() { return isPrimary; } 
+
  protected:
   virtual void setStatus(const std::string& new_status);
+  void auditMessageSent(const scribe::thrift::LogEntry& entry); 
   std::string status;
   std::string categoryHandled;
   bool multiCategory;             // Whether multiple categories are handled
   std::string storeType;
+  // Whether this is a primary store of its parent. This flag is used to decide 
+  // whether to audit the sent messages.
+  bool isPrimary;
 
   // Don't ever take this lock for multiple stores at the same time
   pthread_mutex_t statusMutex;
