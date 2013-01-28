@@ -27,9 +27,6 @@
 using namespace std;
 using namespace boost;
 using namespace scribe::thrift;
-using namespace apache::thrift::concurrency;
-using namespace apache::thrift::protocol;
-using namespace apache::thrift::transport;
 
 #define DEFAULT_TARGET_WRITE_SIZE  16384LL
 #define DEFAULT_MAX_WRITE_INTERVAL 1
@@ -91,126 +88,6 @@ StoreQueue::~StoreQueue() {
   }
 }
 
-void StoreQueue::auditMessage(const LogEntry& entry, bool received) {
-  // If current queue is not for audit category, route the call to audit queue
-  if (!isAuditStore) {
-    // check if audit queue is configured
-    if (auditStore != NULL) {
-      return auditStore->auditMessage(entry, received);
-    } else {
-      return;
-    }
-  }
-
-  // acquire read lock on auditRWMutex. This allows multiple threads to
-  // audit their messages concurrently when audit store queue thread is not
-  // attempting to write audit message.
-  auditRWMutex->acquireRead();
-
-  // iterate through auditMap and find the audit message corresponding
-  // to the category of this entry.
-  shared_ptr<audit_msg_t> audit_msg;
-  audit_map_t::iterator audit_iter;
-  if ((audit_iter = auditMap.find(entry.category)) != auditMap.end()) {
-    audit_msg = audit_iter->second;
-    LOG_OPER("[Audit] Info: Found an audit message instance for category: %s", entry.category.c_str());
-  }
-
-  if (audit_msg == NULL) {
-    // acquire write lock to add a new audit message for this category
-    auditRWMutex->release();
-    auditRWMutex->acquireWrite();
-
-    if ((audit_iter = auditMap.find(entry.category)) != auditMap.end()) {
-      audit_msg = audit_iter->second;
-    } else {
-        audit_msg = shared_ptr<audit_msg_t>(new audit_msg_t);
-        audit_msg->topic = entry.category;
-        auditMap[entry.category] = audit_msg;
-        LOG_OPER("[Audit] Info: Added an audit message instance for category: %s", entry.category.c_str());
-    }
-  } 
-    
-  // get the timestamp of message and update the appropriate counter in audit msg
-  unsigned long long tsKey = getTimestampKeyFromMessage(entry);
-  
-  //TODO: add appropriate synchronization to atomically increment the counter
-  if (received) {
-    unsigned long long counter = audit_msg->received[tsKey];
-    LOG_OPER("[Audit] Info: existing counter for timestamp is: %llu", counter);
-    audit_msg->received[tsKey] = ++counter;
-    LOG_OPER("[Audit] Info: updated recv counter for timestamp to: %llu", counter); 
-  } else {
-    unsigned long long counter = audit_msg->sent[tsKey];
-    audit_msg->sent[tsKey] = ++counter;
-    LOG_OPER("[Audit] Info: updated sent counter for timestamp to: %llu", counter); 
-  }
-
-  // finally, release the audit RW mutex
-  auditRWMutex->release();
-}
-
-unsigned long long StoreQueue::getTimestampKeyFromMessage(const LogEntry& entry) {
-  // assuming that logEntry message is of the format <timestamp><data>
-  // TODO: perform other checks required to handle older version messages.
-  // e.g. check that message length >= 8
-  unsigned long long timestamp = byteArrayToLong(entry.message.data());;
-  LOG_OPER("[Audit] Info: Message entry has timestamp long: %llu", timestamp);
-
-  // TODO: assume windowSizeInMins to be a part of audit config inside scribe.conf
-  // Also check whether we can achieve it like (x - x % window)
-  int windowSizeInMins = 1;
-  return (timestamp/(windowSizeInMins * 60 * 1000)) * (windowSizeInMins * 60 * 1000);
-}
-
-unsigned long long StoreQueue::byteArrayToLong(const char* buf) {
-  int off = 0;
-  return
-    ((long)(buf[off]   & 0xff) << 56) |
-    ((long)(buf[off+1] & 0xff) << 48) |
-    ((long)(buf[off+2] & 0xff) << 40) |
-    ((long)(buf[off+3] & 0xff) << 32) |
-    ((long)(buf[off+4] & 0xff) << 24) |
-    ((long)(buf[off+5] & 0xff) << 16) |
-    ((long)(buf[off+6] & 0xff) <<  8) |
-    ((long)(buf[off+7] & 0xff));
-}
-
-void StoreQueue::performAuditTask() {
-  RWGuard rwMonitor(*auditRWMutex, true);
- 
-  shared_ptr<audit_msg_t> audit_msg;
-  audit_map_t::iterator audit_iter;
-  // create a LogEntry instance from audit message per store and add it to message queue
-  for (audit_iter = auditMap.begin(); audit_iter != auditMap.end(); audit_iter++) {
-    audit_msg = audit_iter->second;
-    // skip auditing if received & sent maps are empty
-    if (audit_msg->received.size() == 0 && audit_msg->sent.size() == 0)
-      continue;
-
-    LOG_OPER("[Audit] Info: Audit task found entry for category %s, received map size [%llu], sent map size [%llu]", 
-      audit_msg->topic.c_str(), audit_msg->received.size(), audit_msg->sent.size());
- 
-    // Perform in-memory Thrift serialization of audit message content
-    // TODO: try to reuse the tmembuf across calls by calling resetBuffer() once done
-    shared_ptr<TMemoryBuffer> tmembuf(new TMemoryBuffer);
-    shared_ptr<TBinaryProtocol> tprot(new TBinaryProtocol(tmembuf));
-    audit_msg->write(tprot.get());
-    
-    // create a LogEntry instance using the serialized payload as string
-    std::string serializedMsg = tmembuf->getBufferAsString();
-    shared_ptr<LogEntry> entry(new LogEntry);
-    entry->category = audit_msg->topic;
-    entry->message = serializedMsg;
-
-    addMessage(entry);
-
-    // finally, clear the contents of received/sent maps within audit message instance
-    audit_msg->received.clear();
-    audit_msg->sent.clear(); 
-  } 
-}
-
 void StoreQueue::addMessage(boost::shared_ptr<LogEntry> entry) {
   if (isModel) {
     LOG_OPER("ERROR: called addMessage on model store");
@@ -238,6 +115,7 @@ void StoreQueue::addMessage(boost::shared_ptr<LogEntry> entry) {
 }
 
 void StoreQueue::configureAndOpen(pStoreConf configuration) {
+  pConf = configuration;
   // model store has to handle this inline since it has no queue
   if (isModel) {
     configureInline(configuration);
@@ -374,10 +252,10 @@ void StoreQueue::threadMember() {
     }
 
     // perform audit specific task if it is an audit store
-    if (isAuditStore && (stop || 
+    if (isAudit && (stop || 
         (this_loop - last_handle_messages >= maxWriteInterval) ||
         msgQueueSize >= targetWriteSize)) {
-      performAuditTask();
+      auditMgr->performAuditTask();
     }
 
     pthread_mutex_lock(&msgMutex);
@@ -464,10 +342,9 @@ void StoreQueue::storeInitCommon() {
     pthread_mutex_init(&hasWorkMutex, NULL);
     pthread_cond_init(&hasWorkCond, NULL);
 
-    // if this is an audit store then initialise audit specific members
+    // if this is an audit store then set audit flag to true
     if (categoryHandled.compare("audit") == 0) {
-      isAuditStore = true;
-      auditRWMutex = scribe::concurrency::createReadWriteMutex(); 
+      isAudit = true;
     }
 
     pthread_create(&storeThread, NULL, threadStatic, (void*) this);

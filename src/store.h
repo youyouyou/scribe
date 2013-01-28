@@ -86,12 +86,11 @@ class Store {
   // don't need to override
   virtual const std::string& getType();
 
-  void setStorePrimary() { isPrimary = true; } 
+  void setStorePrimary(bool primary) { isPrimary = primary; }
   bool isStorePrimary() { return isPrimary; } 
 
  protected:
   virtual void setStatus(const std::string& new_status);
-  void auditMessageSent(const scribe::thrift::LogEntry& entry); 
   std::string status;
   std::string categoryHandled;
   bool multiCategory;             // Whether multiple categories are handled

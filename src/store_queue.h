@@ -25,12 +25,9 @@
 #define SCRIBE_STORE_QUEUE_H
 
 #include "common.h"
-#include "src/gen-cpp/audit_types.h"
-
-typedef audit::thrift::AuditMessage audit_msg_t;
-typedef std::map<std::string, boost::shared_ptr<audit_msg_t> > audit_map_t;
 
 class Store;
+class AuditManager;
 
 /*
  * This class implements a queue and a thread for dispatching
@@ -65,24 +62,20 @@ class StoreQueue {
     return msgQueueSize;
   }
 
-  // this method allows various threads to audit a message when it is received/sent 
-  void auditMessage(const scribe::thrift::LogEntry& entry, bool received);
-  // set the audit store. This should be called only if audit category is configured.
-  void setAuditStore(boost::shared_ptr<StoreQueue> pAudit) { auditStore = pAudit; }
-  boost::shared_ptr<StoreQueue> getAuditStore() { return auditStore; } 
+  // set the audit manager. This would be called only if audit topic is configured.
+  void setAuditManager(boost::shared_ptr<AuditManager> pAudit) { auditMgr = pAudit; }
+  // get the audit manager
+  boost::shared_ptr<AuditManager> getAuditManager() { return auditMgr; } 
+  // return whether this store queue is configured for audit topic
+  bool isAuditStore() { return isAudit; }
+  // return store config. This will be used by audit manager to fetch audit configs.
+  pStoreConf getStoreConfig() { return pConf; }
 
  private:
   void storeInitCommon();
   void configureInline(pStoreConf configuration);
   void openInline();
   void processFailedMessages(boost::shared_ptr<logentry_vector_t> messages);
-  
-  // method to find out the timestamp key for a given entry
-  unsigned long long getTimestampKeyFromMessage(const scribe::thrift::LogEntry& entry);
-  unsigned long long byteArrayToLong(const char* buf);
-  // this method is called by audit store thread to periodically generate audit messages
-  // for all categories and add them to message queue. 
-  void performAuditTask();
 
   // implementation of queues and thread
   enum store_command_t {
@@ -132,14 +125,15 @@ class StoreQueue {
   time_t             maxWriteInterval; // in seconds
   bool               mustSucceed;      // Always retry even if secondary fails
 
-  // audit configuration
-  bool isAuditStore;
-  boost::shared_ptr<StoreQueue> auditStore;
-  audit_map_t auditMap;  
-  boost::shared_ptr<apache::thrift::concurrency::ReadWriteMutex> auditRWMutex;
-
   // Store that will handle messages. This can contain other stores.
   boost::shared_ptr<Store> store;
+
+  // whether current store queue is created for audit topic
+  bool isAudit;
+  // handle to audit manager, if audit topic is configured in scribe
+  boost::shared_ptr<AuditManager> auditMgr;
+  // store configuration
+  pStoreConf pConf;
 };
 
 #endif //!defined SCRIBE_STORE_QUEUE_H

@@ -149,16 +149,6 @@ std::string Store::getStatus() {
   return return_status;
 }
 
-void Store::auditMessageSent(const scribe::thrift::LogEntry& entry) {
-  // skip auditing if it is not a primary store, or if the current store queue
-  // is for audit category
-  if (!isPrimary || categoryHandled.compare("audit") == 0 || !storeQueue->getAuditStore()) {
-    return;
-  }
-
-  storeQueue->auditMessage(entry, false);
-}
-
 bool Store::readOldest(/*out*/ boost::shared_ptr<logentry_vector_t> messages,
                        struct tm* now) {
   LOG_OPER("[%s] ERROR: attempting to read from a write-only store",
@@ -904,12 +894,13 @@ bool FileStore::writeMessages(boost::shared_ptr<logentry_vector_t> messages,
           messages->end() == iter + 1 ) {
         bool status = write_file->write(write_buffer);
         if (status) {
-          // if write succeeded, audit these messages if it is a primary store
+          // if write succeeded, audit these messages as sent ONLY if it is a
+          // primary file store AND message category is not audit AND there is
+          // an audit store configured in scribe
           if (isPrimary && (categoryHandled.compare("audit") != 0) && 
-              storeQueue->getAuditStore()) {
-            for (unsigned long index = num_written; index < num_written + num_buffered; index++) {
-              storeQueue->auditMessage(*(messages->at(index)), false);
-            }
+              (storeQueue->getAuditManager() != NULL)) {
+            storeQueue->getAuditManager()->auditMessages(messages, categoryHandled, 
+            num_written, num_written + num_buffered, false);
           }
         } else {
           LOG_OPER("[%s] File store failed to write (%lu) messages to file",
@@ -1433,7 +1424,9 @@ void BufferStore::configure(pStoreConf configuration, pStoreConf parent) {
       primaryStore->configure(primary_store_conf, storeConf);
       // set the primary flag for this store to true. This will be used later
       // to decide whether to audit the sent messages. 
-      primaryStore->setStorePrimary();
+      primaryStore->setStorePrimary(true);
+      LOG_OPER("Store of type [%s] and category [%s] set to primary",
+               type.c_str(),categoryHandled.c_str());
     }
   }
 
@@ -1510,6 +1503,8 @@ shared_ptr<Store> BufferStore::copy(const std::string &category) {
   store->adaptiveBackoff = adaptiveBackoff;
 
   store->primaryStore = primaryStore->copy(category);
+  // copy the primary status
+  store->primaryStore->setStorePrimary(primaryStore->isStorePrimary());
   store->secondaryStore = secondaryStore->copy(category);
   return copied;
 }
@@ -2061,7 +2056,16 @@ NetworkStore::handleMessages(boost::shared_ptr<logentry_vector_t> messages) {
         g_Handler->incCounter(categoryHandled, "eofs");
     close();
   }
-  return (ret == CONN_OK);
+  bool status = (ret == CONN_OK);
+  // if write succeeded, audit these messages as sent ONLY if it is a primary
+  // store AND message category is not audit AND audit store is configured in scribe
+  if (status && isPrimary && (categoryHandled.compare("audit") != 0) &&
+      storeQueue->getAuditManager()) {
+    storeQueue->getAuditManager()->auditMessages(messages, categoryHandled, 0,
+        messages->size(), false);
+  }
+
+  return status;
 }
 
 void NetworkStore::flush() {

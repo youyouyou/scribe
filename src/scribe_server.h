@@ -26,6 +26,7 @@
 
 #include "store.h"
 #include "store_queue.h"
+#include "scribe_audit.h"
 
 typedef std::vector<boost::shared_ptr<StoreQueue> > store_list_t;
 typedef std::map<std::string, boost::shared_ptr<store_list_t> > category_map_t;
@@ -101,6 +102,7 @@ class scribeHandler : virtual public scribe::thrift::scribeIf,
   StoreConf config;
   bool newThreadPerCategory;
   boost::shared_ptr<StoreQueue> auditStore;
+  boost::shared_ptr<AuditManager> auditMgr;
 
   /* mutex to syncronize access to scribeHandler.
    * A single mutex is fine since it only needs to be locked in write mode
@@ -132,8 +134,9 @@ class scribeHandler : virtual public scribe::thrift::scribeIf,
     createNewCategory(const std::string& category);
   void addMessage(const scribe::thrift::LogEntry& entry,
                   const boost::shared_ptr<store_list_t>& store_list);
+  
   void auditMessageReceived(const scribe::thrift::LogEntry& entry);
-  void configureAuditStoreToStores();
+  void configureAuditManagerInAllStores();
 };
 extern boost::shared_ptr<scribeHandler> g_Handler;
 #endif // SCRIBE_SERVER_H
