@@ -178,6 +178,17 @@ const std::string& Store::getType() {
   return storeType;
 }
 
+void Store::auditMessagesSent(boost::shared_ptr<logentry_vector_t>& messages,
+                         unsigned long offset, unsigned long count) {
+  // audit these messages as sent ONLY if it is a primary store AND
+  // message category is not audit AND audit store is configured in scribe
+  if (isPrimary && (categoryHandled.compare("audit") != 0) &&
+      (storeQueue->getAuditManager() != NULL)) {
+    storeQueue->getAuditManager()->auditMessages(messages, categoryHandled,
+    offset, count, false);
+  }
+}
+
 FileStoreBase::FileStoreBase(StoreQueue* storeq,
                              const string& category,
                              const string &type, bool multi_category)
@@ -894,14 +905,8 @@ bool FileStore::writeMessages(boost::shared_ptr<logentry_vector_t> messages,
           messages->end() == iter + 1 ) {
         bool status = write_file->write(write_buffer);
         if (status) {
-          // if write succeeded, audit these messages as sent ONLY if it is a
-          // primary file store AND message category is not audit AND there is
-          // an audit store configured in scribe
-          if (isPrimary && (categoryHandled.compare("audit") != 0) && 
-              (storeQueue->getAuditManager() != NULL)) {
-            storeQueue->getAuditManager()->auditMessages(messages, categoryHandled, 
-            num_written, num_written + num_buffered, false);
-          }
+          // if write succeeded, audit these messages as sent 
+          auditMessagesSent(messages, num_written, num_buffered);
         } else {
           LOG_OPER("[%s] File store failed to write (%lu) messages to file",
                    categoryHandled.c_str(), messages->size());
@@ -2057,12 +2062,9 @@ NetworkStore::handleMessages(boost::shared_ptr<logentry_vector_t> messages) {
     close();
   }
   bool status = (ret == CONN_OK);
-  // if write succeeded, audit these messages as sent ONLY if it is a primary
-  // store AND message category is not audit AND audit store is configured in scribe
-  if (status && isPrimary && (categoryHandled.compare("audit") != 0) &&
-      storeQueue->getAuditManager()) {
-    storeQueue->getAuditManager()->auditMessages(messages, categoryHandled, 0,
-        messages->size(), false);
+  // if write succeeded, audit these messages as sent
+  if (status) {
+    auditMessagesSent(messages, 0, messages->size());
   }
 
   return status;

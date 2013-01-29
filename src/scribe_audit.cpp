@@ -73,7 +73,7 @@ AuditManager::~AuditManager() {
 }
 
 void AuditManager::auditMessage(const LogEntry& entry, bool received) {
-  // the store queue should be configured for audit category
+  // this store queue must be configured for audit topic 
   if (!auditStore->isAuditStore()) {
     return;
   }
@@ -82,20 +82,32 @@ void AuditManager::auditMessage(const LogEntry& entry, bool received) {
   // their messages concurrently when audit store queue thread is not attempting
   // to write audit message.
   auditRWMutex->acquireRead();
+  
+  try {
+    // get the audit message entry in audit map for the given category 
+    shared_ptr<audit_msg_t> audit_msg = getAuditMsg(entry.category);
 
-  // get the audit message entry in audit map for the given category 
-  shared_ptr<audit_msg_t> audit_msg = getAuditMsg(entry.category);
+    // update the audit message counter for the given message
+    updateAuditMessageCounter(entry, audit_msg, received);
 
-  // update the audit message counter for the given message
-  updateAuditMessageCounter(entry, audit_msg, received);
-
-  // finally, release the audit RW mutex
-  auditRWMutex->release();
+    // finally, release the audit RW mutex
+    auditRWMutex->release();
+  } catch (const std::exception& e) {
+    LOG_OPER("[Audit] Failed to audit message. Error <%s>", e.what());
+    // release audit RW mutex, else it could block other threads waiting on mutex
+    auditRWMutex->release();
+    return;
+  } catch (...) { 
+    LOG_OPER("[Audit] Failed to audit message. Unexpected error.");
+    // release audit RW mutex, else it could block other threads waiting on mutex
+    auditRWMutex->release();
+    return;
+  }
 }
 
 void AuditManager::auditMessages(shared_ptr<logentry_vector_t>& messages, 
      const string& category, unsigned long offset, unsigned long count, bool received) {
-  // the store queue should be configured for audit category
+  // this store queue must be configured for audit topic 
   if (!auditStore->isAuditStore()) {
     return;
   }
@@ -105,16 +117,28 @@ void AuditManager::auditMessages(shared_ptr<logentry_vector_t>& messages,
   // to write audit message.
   auditRWMutex->acquireRead();
 
-  // get the audit message entry in audit map for the given category 
-  shared_ptr<audit_msg_t> audit_msg = getAuditMsg(category);
+  try {
+    // get the audit message entry in audit map for the given category 
+    shared_ptr<audit_msg_t> audit_msg = getAuditMsg(category);
 
-  // update the audit message counter for the given message
-  for (unsigned long index = offset; index < offset + count; index++) {
-    updateAuditMessageCounter(*(messages->at(index)), audit_msg, received);
+    // update audit message counter for the given messages
+    for (unsigned long index = offset; index < offset + count; index++) {
+      updateAuditMessageCounter(*(messages->at(index)), audit_msg, received);
+    }
+
+    // finally, release the audit RW mutex
+    auditRWMutex->release();
+  } catch (const std::exception& e) {
+    LOG_OPER("[Audit] Failed to audit message. Error <%s>", e.what());
+    // release audit RW mutex, else it could block other threads waiting on mutex
+    auditRWMutex->release();
+    return;
+  } catch (...) { 
+    LOG_OPER("[Audit] Failed to audit message. Unexpected error.");
+    // release audit RW mutex, else it could block other threads waiting on mutex
+    auditRWMutex->release();
+    return;
   }
-
-  // finally, release the audit RW mutex
-  auditRWMutex->release();
 }
 
 shared_ptr<audit_msg_t> AuditManager::getAuditMsg(const string& category) {
@@ -122,8 +146,6 @@ shared_ptr<audit_msg_t> AuditManager::getAuditMsg(const string& category) {
   audit_map_t::iterator audit_iter;
   if ((audit_iter = auditMap.find(category)) != auditMap.end()) {
     audit_msg = audit_iter->second;
-    LOG_OPER("[Audit] Info: Found an audit message instance for category: %s",
-             category.c_str());
   }
 
   if (audit_msg == NULL) {
@@ -141,8 +163,6 @@ shared_ptr<audit_msg_t> AuditManager::getAuditMsg(const string& category) {
       pthread_mutex_init(&(audit_msg->mutex), NULL);
       // add audit msg to audit map
       auditMap[category] = audit_msg;
-      LOG_OPER("[Audit] Info: Added an audit message instance for category: %s",
-               category.c_str());
     }
   }
 
@@ -163,11 +183,9 @@ void AuditManager::updateAuditMessageCounter(const LogEntry& entry,
   if (received) {
     unsigned long long counter = audit_msg->received[tsKey];
     audit_msg->received[tsKey] = ++counter;
-    LOG_OPER("[Audit] Info: updated recv counter for tsKey [%llu] to: %llu", tsKey, counter);
   } else {
     unsigned long long counter = audit_msg->sent[tsKey];
     audit_msg->sent[tsKey] = ++counter;
-    LOG_OPER("[Audit] Info: updated sent counter for tsKey [%llu] to: %llu", tsKey, counter);
   }
   pthread_mutex_unlock(&(audit_msg->mutex));
 }
@@ -175,6 +193,12 @@ void AuditManager::updateAuditMessageCounter(const LogEntry& entry,
 unsigned long long AuditManager::validateMessageAndGetTimestamp(const LogEntry& entry) {
   // assuming that logEntry message is of the format:
   // <version><magic bytes><timestamp><message size><message>
+  
+  // first check that total message length should be at least 16
+  if ((int)entry.message.length() < headerLength) {
+    return 0;
+  }
+
   const char* data = entry.message.data();
 
   // first validate the version byte
@@ -201,7 +225,6 @@ unsigned long long AuditManager::validateMessageAndGetTimestamp(const LogEntry& 
     ((long)(data[9]  & 0xff) << 16) |
     ((long)(data[10] & 0xff) <<  8) |
     ((long)(data[11] & 0xff));
-  //LOG_OPER("[Audit] Info: Message entry has timestamp long: %llu", timestamp);
 
   // now validate message size
   int size =
@@ -215,8 +238,6 @@ unsigned long long AuditManager::validateMessageAndGetTimestamp(const LogEntry& 
     return 0;
   }
 
-  LOG_OPER("Audit: Info: Received message headers: version: %d, timestamp: %llu, size: %d",
-           version, timestamp, size);
   return timestamp - timestamp % (windowSize * 1000);
 }
 
@@ -226,30 +247,36 @@ void AuditManager::performAuditTask() {
   gettimeofday(&tv, NULL);
   long timeInMillis = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
 
-  // acquire write lock on auditRWMutex 
+  // acquire write lock on auditRWMutex using RWGuard 
   RWGuard rwMonitor(*auditRWMutex, true);
 
-  shared_ptr<audit_msg_t> audit_msg;
-  audit_map_t::iterator audit_iter;
-  // create a LogEntry instance from audit message per store and add it to message queue
-  for (audit_iter = auditMap.begin(); audit_iter != auditMap.end(); audit_iter++) {
-    audit_msg = audit_iter->second;
-    // skip auditing if received & sent maps are empty
-    if (audit_msg->received.size() == 0 && audit_msg->sent.size() == 0)
-      continue;
+  try {
+    shared_ptr<audit_msg_t> audit_msg;
+    audit_map_t::iterator audit_iter;
+    // create a LogEntry instance from audit message per store and add it to message queue
+    for (audit_iter = auditMap.begin(); audit_iter != auditMap.end(); audit_iter++) {
+      audit_msg = audit_iter->second;
+      // skip auditing if received & sent maps are empty
+      if (audit_msg->received.size() == 0 && audit_msg->sent.size() == 0)
+        continue;
 
-    LOG_OPER("[Audit] Info: Audit task found entry for category %s, received map size [%llu], sent map size [%llu]",
-      audit_msg->topic.c_str(), (long long)audit_msg->received.size(), (long long)audit_msg->sent.size());
+      LOG_OPER("[Audit] Info: Audit Task found entry for category %s, received map size [%llu], sent map size [%llu]",
+        audit_msg->topic.c_str(), (long long)audit_msg->received.size(), (long long)audit_msg->sent.size());
 
-    // create a LogEntry instance from audit msg
-    shared_ptr<LogEntry> entry = serializeAuditMsg(audit_msg, timeInMillis);
+      // create a LogEntry instance from audit msg
+      shared_ptr<LogEntry> entry = serializeAuditMsg(audit_msg, timeInMillis);
 
-    // add the LogEntry instance to store queue
-    auditStore->addMessage(entry);
+      // add the LogEntry instance to store queue
+      auditStore->addMessage(entry);
 
-    // finally, clear the contents of received/sent maps within audit message instance
-    audit_msg->received.clear();
-    audit_msg->sent.clear();
+      // finally, clear the contents of received/sent maps within audit message instance
+      audit_msg->received.clear();
+      audit_msg->sent.clear();
+    }
+  } catch (const std::exception& e) {
+    LOG_OPER("[Audit] Store thread failed to perform audit task . Error <%s>", e.what());
+  } catch (...) {
+    LOG_OPER("[Audit] Store thread failed to perform audit task . Unexpected error");
   }
 }
 

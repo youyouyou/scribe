@@ -91,6 +91,9 @@ class Store {
 
  protected:
   virtual void setStatus(const std::string& new_status);
+  // this method audits the messages as sent through audit manager
+  void auditMessagesSent(boost::shared_ptr<logentry_vector_t>& messages,
+                         unsigned long offset, unsigned long count);
   std::string status;
   std::string categoryHandled;
   bool multiCategory;             // Whether multiple categories are handled
