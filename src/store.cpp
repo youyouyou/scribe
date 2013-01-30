@@ -559,9 +559,6 @@ void FileStoreBase::printStats() {
   string log_str = msg.str();
   LOG_OPER("[%s]", log_str.c_str());
   /*stats_file->write(msg.str());*/
-  // update the stats
-  g_Handler->incCounter(categoryHandled, fsType + "_wrote_num_messages", eventsWritten);
-  g_Handler->incCounter(categoryHandled, fsType + "_wrote_bytes", currentSize);  
   stats_file->close();
 }
 
@@ -744,6 +741,10 @@ bool FileStore::openInternal(bool incrementFilename, struct tm* current_time) {
       }
       // else it confuses the filename code on reads
 
+      // update stats
+      g_Handler->incCounter(categoryHandled, fsType + "_wrote_num_messages", eventsWritten);
+      g_Handler->incCounter(categoryHandled, fsType + "_wrote_bytes", currentSize);
+ 
       LOG_OPER("[%s] Opened file <%s> for writing", categoryHandled.c_str(),
               file.c_str());
 
