@@ -542,7 +542,7 @@ void FileStoreBase::printStats() {
     return;
   }
 
-  time_t rawtime = time(NULL);
+  /*time_t rawtime = time(NULL);
   struct tm timeinfo;
   localtime_r(&rawtime, &timeinfo);
 
@@ -558,7 +558,7 @@ void FileStoreBase::printStats() {
 
   string log_str = msg.str();
   LOG_OPER("[%s]", log_str.c_str());
-  /*stats_file->write(msg.str());*/
+  stats_file->write(msg.str());*/
   stats_file->close();
 }
 
@@ -695,7 +695,7 @@ bool FileStore::openInternal(bool incrementFilename, struct tm* current_time) {
       if (writeMeta) {
         writeFile->write(meta_logfile_prefix + file);
       }
-      writeFile->close();
+      closeWriteFile();
     }
 
     writeFile = FileInterface::createFileInterface(fsType, file, isBufferFile);
@@ -769,10 +769,32 @@ bool FileStore::isOpen() {
   return writeFile && writeFile->isOpen();
 }
 
-void FileStore::close() {
+void FileStroe::closeWriteFile() {
   if (writeFile) {
     writeFile->close();
+    if (writeStats && !(writeFile->isOpen()) ) {
+      time_t rawtime = time(NULL);
+      struct tm timeinfo;
+      localtime_r(&rawtime, &timeinfo);
+
+      ostringstream msg;
+      msg << timeinfo.tm_year + 1900  << '-'
+          << setw(2) << setfill('0') << timeinfo.tm_mon + 1 << '-'
+          << setw(2) << setfill('0') << timeinfo.tm_mday << '-'
+          << setw(2) << setfill('0') << timeinfo.tm_hour << ':'
+          << setw(2) << setfill('0') << timeinfo.tm_min;
+
+      msg << " wrote <" << currentSize << "> bytes in <" << eventsWritten
+          << "> events to file <" << currentFilename << ">" << endl;
+
+      string log_str = msg.str();
+      LOG_OPER("[%s]", log_str.c_str());
+    }
   }
+}
+
+void FileStore::close() {
+  closeWriteFile();
 }
 
 void FileStore::flush() {

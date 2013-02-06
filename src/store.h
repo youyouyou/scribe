@@ -200,6 +200,7 @@ class FileStore : public FileStoreBase {
   bool handleMessages(boost::shared_ptr<logentry_vector_t> messages);
   bool isOpen();
   void configure(pStoreConf configuration, pStoreConf parent);
+  void closeWriteFile();
   void close();
   void flush();
 
