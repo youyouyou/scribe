@@ -769,7 +769,7 @@ bool FileStore::isOpen() {
   return writeFile && writeFile->isOpen();
 }
 
-void FileStroe::closeWriteFile() {
+void FileStore::closeWriteFile() {
   if (writeFile) {
     writeFile->close();
     if (writeStats && !(writeFile->isOpen()) ) {
