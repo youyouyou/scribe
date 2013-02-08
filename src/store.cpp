@@ -924,6 +924,7 @@ bool FileStore::writeMessages(boost::shared_ptr<logentry_vector_t> messages,
 
         num_written += num_buffered;
         currentSize += current_size_buffered;
+        eventsWritten += num_buffered;
         num_buffered = 0;
         current_size_buffered = 0;
         write_buffer = "";
@@ -940,8 +941,6 @@ bool FileStore::writeMessages(boost::shared_ptr<logentry_vector_t> messages,
              categoryHandled.c_str(), e.what());
     success = false;
   }
-
-  eventsWritten += num_written;
 
   if (!success) {
     close();
