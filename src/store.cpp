@@ -182,7 +182,7 @@ void Store::auditMessagesSent(boost::shared_ptr<logentry_vector_t>& messages,
                          unsigned long offset, unsigned long count) {
   // audit these messages as sent ONLY if it is a primary store AND
   // message category is not audit AND audit store is configured in scribe
-  if (isPrimary && (categoryHandled.compare("audit") != 0) &&
+  if (isPrimary && (categoryHandled.compare(auditTopic) != 0) &&
       (storeQueue->getAuditManager() != NULL)) {
     storeQueue->getAuditManager()->auditMessages(messages, categoryHandled,
     offset, count, false);

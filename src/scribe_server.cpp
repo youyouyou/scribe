@@ -422,7 +422,7 @@ void scribeHandler::addMessage(
 void scribeHandler::auditMessageReceived(const LogEntry& entry) {
   // if audit manager is configured and message category itself is not audit,
   // then audit this message as received
-  if (auditMgr!= NULL && (entry.category.compare("audit") != 0)) {
+  if (auditMgr!= NULL && (entry.category.compare(auditTopic) != 0)) {
     auditMgr->auditMessage(entry, true);
   }
 }
@@ -929,7 +929,7 @@ shared_ptr<StoreQueue> scribeHandler::configureStoreCategory(
   }
 
   // check if the category is 'audit'
-  if (category.compare("audit") == 0) {
+  if (category.compare(auditTopic) == 0) {
     auditMgr = shared_ptr<AuditManager>(new AuditManager(pstore)); 
   }
 

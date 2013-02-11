@@ -35,6 +35,8 @@ typedef std::map<std::string, boost::shared_ptr<audit_msg_t> > audit_map_t;
 
 class StoreQueue;
 
+static const std::string auditTopic = "_audit";
+
 class AuditManager  {
  public:
   AuditManager(const boost::shared_ptr<StoreQueue> pAuditStore);
@@ -54,8 +56,8 @@ class AuditManager  {
   // method to validate message headers. If message is valid it returns timestamp else 0.
   unsigned long long validateMessageAndGetTimestamp(const scribe::thrift::LogEntry& entry);
   // update the audit message counter for the given message
-  void updateAuditMessageCounter(const scribe::thrift::LogEntry& entry,
-       boost::shared_ptr<audit_msg_t>& audit_msg, bool received);
+  void updateAuditMessageCounter(boost::shared_ptr<audit_msg_t>& audit_msg,
+       unsigned long long timestampKey, bool received);
   // serialize the audit message
   logentry_ptr_t serializeAuditMsg(boost::shared_ptr<audit_msg_t>& audit_msg,
        long timeInMillis);

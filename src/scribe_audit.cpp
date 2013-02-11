@@ -34,6 +34,8 @@ unsigned char const magicBytes[] = {0xAB, 0xCD, 0xEF};
 // [<version><magic bytes><timestamp><message size>]<message>
 // number of bytes taken by header = 1 + 3 + 8 + 4 = 16
 const int headerLength = 16;
+// minimum cut-off value of timestamp (01-Jan-2013)
+const unsigned long long minTimestamp = 1356998400000LL;
 
 AuditManager::AuditManager(const shared_ptr<StoreQueue> pAuditStore) {
   auditStore = pAuditStore;
@@ -78,6 +80,22 @@ void AuditManager::auditMessage(const LogEntry& entry, bool received) {
     return;
   }
 
+  // get the timestamp of message
+  unsigned long long tsKey = 0;
+  try {
+    tsKey = validateMessageAndGetTimestamp(entry);
+
+    // if tsKey is 0, then probably message doesn't have a valid header; hence skip it
+    if (tsKey == 0)
+      return;
+  } catch (const std::exception& e) {
+    LOG_OPER("[Audit] Failed to validate message. Error <%s>", e.what());
+    return;
+  } catch (...) { 
+    LOG_OPER("[Audit] Failed to validate message. Unexpected error.");
+    return;
+  }
+
   // acquire read lock on auditRWMutex. This allows multiple threads to audit
   // their messages concurrently when audit store queue thread is not attempting
   // to write audit message.
@@ -87,8 +105,8 @@ void AuditManager::auditMessage(const LogEntry& entry, bool received) {
     // get the audit message entry in audit map for the given category 
     shared_ptr<audit_msg_t> audit_msg = getAuditMsg(entry.category);
 
-    // update the audit message counter for the given message
-    updateAuditMessageCounter(entry, audit_msg, received);
+    // update audit message counter for the given message
+    updateAuditMessageCounter(audit_msg, tsKey, received);
 
     // finally, release the audit RW mutex
     auditRWMutex->release();
@@ -121,9 +139,16 @@ void AuditManager::auditMessages(shared_ptr<logentry_vector_t>& messages,
     // get the audit message entry in audit map for the given category 
     shared_ptr<audit_msg_t> audit_msg = getAuditMsg(category);
 
-    // update audit message counter for the given messages
     for (unsigned long index = offset; index < offset + count; index++) {
-      updateAuditMessageCounter(*(messages->at(index)), audit_msg, received);
+      // get the timestamp of message and update the appropriate counter in audit msg
+      unsigned long long tsKey = validateMessageAndGetTimestamp(*(messages->at(index)));
+
+      // if tsKey is 0, then probably message doesn't have a valid header; hence skip it
+      if (tsKey == 0)
+        continue;
+
+      // update audit message counter for the given message
+      updateAuditMessageCounter(audit_msg, tsKey, received);
     }
 
     // finally, release the audit RW mutex
@@ -169,23 +194,16 @@ shared_ptr<audit_msg_t> AuditManager::getAuditMsg(const string& category) {
   return audit_msg;
 }
 
-void AuditManager::updateAuditMessageCounter(const LogEntry& entry,
-       shared_ptr<audit_msg_t>& audit_msg, bool received) {
-  // get the timestamp of message and update the appropriate counter in audit msg
-  unsigned long long tsKey = validateMessageAndGetTimestamp(entry);
-  
-  // if tsKey is 0, then probably message doesn't have a valid header; hence skip it
-  if (tsKey == 0)
-    return;
-
+void AuditManager::updateAuditMessageCounter(shared_ptr<audit_msg_t>& audit_msg,
+       unsigned long long timestampKey, bool received) {
   // acquire mutex to synchronize access to map and insert/increment counter
   pthread_mutex_lock(&(audit_msg->mutex));
   if (received) {
-    unsigned long long counter = audit_msg->received[tsKey];
-    audit_msg->received[tsKey] = ++counter;
+    unsigned long long counter = audit_msg->received[timestampKey];
+    audit_msg->received[timestampKey] = ++counter;
   } else {
-    unsigned long long counter = audit_msg->sent[tsKey];
-    audit_msg->sent[tsKey] = ++counter;
+    unsigned long long counter = audit_msg->sent[timestampKey];
+    audit_msg->sent[timestampKey] = ++counter;
   }
   pthread_mutex_unlock(&(audit_msg->mutex));
 }
@@ -225,6 +243,11 @@ unsigned long long AuditManager::validateMessageAndGetTimestamp(const LogEntry& 
     ((long)(data[9]  & 0xff) << 16) |
     ((long)(data[10] & 0xff) <<  8) |
     ((long)(data[11] & 0xff));
+
+  // validate that timestamp value must be greater than min cut-off
+  if (timestamp < minTimestamp) {
+    return 0;
+  }
 
   // now validate message size
   int size =
@@ -300,7 +323,7 @@ shared_ptr<LogEntry> AuditManager::serializeAuditMsg(shared_ptr<audit_msg_t>& au
 
   // create a LogEntry instance using the serialized payload as string
   shared_ptr<LogEntry> entry(new LogEntry);
-  entry->category = "audit";
+  entry->category = auditTopic;
   entry->message = tmembuf->getBufferAsString();
 
   return entry; 

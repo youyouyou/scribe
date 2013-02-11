@@ -343,7 +343,7 @@ void StoreQueue::storeInitCommon() {
     pthread_cond_init(&hasWorkCond, NULL);
 
     // if this is an audit store then set audit flag to true
-    if (categoryHandled.compare("audit") == 0) {
+    if (categoryHandled.compare(auditTopic) == 0) {
       isAudit = true;
     }
 
