@@ -201,6 +201,7 @@ FileStoreBase::FileStoreBase(StoreQueue* storeq,
     writeStats(false),
     rotateOnReopen(false),
     currentSize(0),
+    eventSize(0),
     lastRollTime(0),
     eventsWritten(0) {
 }
@@ -740,17 +741,12 @@ bool FileStore::openInternal(bool incrementFilename, struct tm* current_time) {
         writeFile->createSymlink(symtarget, symlinkName);
       }
       // else it confuses the filename code on reads
-
-      // update stats
-      g_Handler->incCounter(categoryHandled, fsType + "_wrote_num_messages", eventsWritten);
-      g_Handler->incCounter(categoryHandled, fsType + "_wrote_bytes", currentSize);
  
       LOG_OPER("[%s] Opened file <%s> for writing", categoryHandled.c_str(),
               file.c_str());
 
       currentSize = writeFile->fileSize();
       currentFilename = file;
-      eventsWritten = 0;
       setStatus("");
     }
 
@@ -784,12 +780,18 @@ void FileStore::closeWriteFile() {
           << setw(2) << setfill('0') << timeinfo.tm_hour << ':'
           << setw(2) << setfill('0') << timeinfo.tm_min;
 
-      msg << " wrote <" << currentSize << "> bytes in <" << eventsWritten
+      msg << " wrote <" << eventSize << "> bytes in <" << eventsWritten
           << "> events to file <" << currentFilename << ">" << endl;
 
       string log_str = msg.str();
       LOG_OPER("[%s]", log_str.c_str());
     }
+    // update stats
+    g_Handler->incCounter(categoryHandled, fsType + "_wrote_num_messages", eventsWritten);
+    g_Handler->incCounter(categoryHandled, fsType + "_wrote_bytes", eventSize);
+    
+    eventsWritten = 0;
+    eventsSize = 0;
   }
 }
 
@@ -924,6 +926,7 @@ bool FileStore::writeMessages(boost::shared_ptr<logentry_vector_t> messages,
 
         num_written += num_buffered;
         currentSize += current_size_buffered;
+        eventSize += current_size_buffered;
         eventsWritten += num_buffered;
         num_buffered = 0;
         current_size_buffered = 0;
