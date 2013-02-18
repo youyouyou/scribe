@@ -791,7 +791,7 @@ void FileStore::closeWriteFile() {
     g_Handler->incCounter(categoryHandled, fsType + "_wrote_bytes", eventSize);
     
     eventsWritten = 0;
-    eventsSize = 0;
+    eventSize = 0;
   }
 }
 
