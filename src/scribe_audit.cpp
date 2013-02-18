@@ -186,6 +186,9 @@ shared_ptr<audit_msg_t> AuditManager::getAuditMsg(const string& category) {
       audit_msg->topic = category;
       // initialize the mutex associated with this audit message
       pthread_mutex_init(&(audit_msg->mutex), NULL);
+      // initialize the received/sent counters for this category
+      audit_msg->receivedCount = 0;
+      audit_msg->sentCount = 0;
       // add audit msg to audit map
       auditMap[category] = audit_msg;
     }
@@ -201,9 +204,11 @@ void AuditManager::updateAuditMessageCounter(shared_ptr<audit_msg_t>& audit_msg,
   if (received) {
     unsigned long long counter = audit_msg->received[timestampKey];
     audit_msg->received[timestampKey] = ++counter;
+    ++(audit_msg->receivedCount);
   } else {
     unsigned long long counter = audit_msg->sent[timestampKey];
     audit_msg->sent[timestampKey] = ++counter;
+    ++(audit_msg->sentCount);
   }
   pthread_mutex_unlock(&(audit_msg->mutex));
 }
@@ -283,8 +288,8 @@ void AuditManager::performAuditTask() {
       if (audit_msg->received.size() == 0 && audit_msg->sent.size() == 0)
         continue;
 
-      LOG_OPER("[Audit] Info: Audit Task found entry for category %s, received map size [%llu], sent map size [%llu]",
-        audit_msg->topic.c_str(), (long long)audit_msg->received.size(), (long long)audit_msg->sent.size());
+      LOG_OPER("[Audit] category [%s], messages received [%llu], messages sent [%llu]",
+        audit_msg->topic.c_str(), audit_msg->receivedCount, audit_msg->sentCount);
 
       // create a LogEntry instance from audit msg
       shared_ptr<LogEntry> entry = serializeAuditMsg(audit_msg, timeInMillis);
@@ -292,14 +297,18 @@ void AuditManager::performAuditTask() {
       // add the LogEntry instance to store queue
       auditStore->addMessage(entry);
 
-      // finally, clear the contents of received/sent maps within audit message instance
+      // now clear the contents of received/sent maps within audit message instance
       audit_msg->received.clear();
       audit_msg->sent.clear();
+
+      // finally clear the received/sent counters for this audit message instance
+      audit_msg->receivedCount = 0;
+      audit_msg->sentCount = 0;
     }
   } catch (const std::exception& e) {
-    LOG_OPER("[Audit] Store thread failed to perform audit task . Error <%s>", e.what());
+    LOG_OPER("[Audit] Store thread failed to perform audit task. Error <%s>", e.what());
   } catch (...) {
-    LOG_OPER("[Audit] Store thread failed to perform audit task . Unexpected error");
+    LOG_OPER("[Audit] Store thread failed to perform audit task. Unexpected error");
   }
 }
 

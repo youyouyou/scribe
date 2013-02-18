@@ -101,7 +101,6 @@ class scribeHandler : virtual public scribe::thrift::scribeIf,
   unsigned long long maxQueueSize;
   StoreConf config;
   bool newThreadPerCategory;
-  boost::shared_ptr<StoreQueue> auditStore;
   boost::shared_ptr<AuditManager> auditMgr;
 
   /* mutex to syncronize access to scribeHandler.

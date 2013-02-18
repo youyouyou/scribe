@@ -290,9 +290,9 @@ bool scribeHandler::createCategoryFromModel(
   }
   pstores->push_back(pstore);
 
-  if (auditMgr != NULL) {
+  if (auditMgr != NULL && auditMgr.get() != NULL) {
     pstore->setAuditManager(auditMgr);
-    LOG_OPER("configured audit for category [%s]", category.c_str());
+    LOG_OPER("[%s] configured audit manager in store", category.c_str());
   }
 
   return true;
@@ -422,8 +422,17 @@ void scribeHandler::addMessage(
 void scribeHandler::auditMessageReceived(const LogEntry& entry) {
   // if audit manager is configured and message category itself is not audit,
   // then audit this message as received
-  if (auditMgr!= NULL && (entry.category.compare(auditTopic) != 0)) {
-    auditMgr->auditMessage(entry, true);
+  try {
+    if (auditMgr != NULL  && auditMgr.get() != NULL &&
+       (entry.category.compare(auditTopic) != 0)) {
+      auditMgr->auditMessage(entry, true);
+    }
+  } catch (const std::exception& e) {
+    LOG_OPER("[%s] Failed to audit received message. Error <%s>", 
+      entry.category.c_str(), e.what());
+  } catch (...) {
+    LOG_OPER("[%s] Failed to audit received message. Unexpected error.",
+      entry.category.c_str());
   }
 }
 
@@ -667,8 +676,9 @@ void scribeHandler::initialize() {
   if (numstores) {
     LOG_OPER("configured <%d> stores", numstores);
 
-    // if audit store is configured, pass audit store to other stores
-    if (auditMgr != NULL) {
+    // if audit manager is initialized, pass it to all stores
+    if (auditMgr != NULL && auditMgr.get() != NULL) {
+      LOG_OPER("configuring audit manager in all stores");
       configureAuditManagerInAllStores(); 
    }
   } else {
@@ -726,7 +736,7 @@ void scribeHandler::configureAuditManagerInAllStores() {
       storeCount++;
     }
 
-  LOG_OPER("configured audit in <%d> stores", storeCount);
+  LOG_OPER("configured audit manager in <%d> stores", storeCount);
 }
 
 // Configures the store specified by the store configuration. Returns false if failed.
@@ -928,9 +938,11 @@ shared_ptr<StoreQueue> scribeHandler::configureStoreCategory(
     pstores->push_back(pstore);
   }
 
-  // check if the category is 'audit'
+  // check if the category is '_audit'
   if (category.compare(auditTopic) == 0) {
-    auditMgr = shared_ptr<AuditManager>(new AuditManager(pstore)); 
+    auditMgr = shared_ptr<AuditManager>(new AuditManager(pstore));
+    pstore->setAuditStore(true);
+    LOG_OPER("[%s] Initialized audit manager", category.c_str()); 
   }
 
   return pstore;

@@ -66,8 +66,10 @@ class StoreQueue {
   void setAuditManager(boost::shared_ptr<AuditManager> pAudit) { auditMgr = pAudit; }
   // get the audit manager
   boost::shared_ptr<AuditManager> getAuditManager() { return auditMgr; } 
-  // return whether this store queue is configured for audit topic
+  // return whether this store queue manages audit topic
   bool isAuditStore() { return isAudit; }
+  // set whether this store queue will manage audit topic
+  void setAuditStore(bool audit) { isAudit = audit; }
   // return store config. This will be used by audit manager to fetch audit configs.
   pStoreConf getStoreConfig() { return pConf; }
 
@@ -128,7 +130,7 @@ class StoreQueue {
   // Store that will handle messages. This can contain other stores.
   boost::shared_ptr<Store> store;
 
-  // whether current store queue is created for audit topic
+  // whether current store queue manages audit topic
   bool isAudit;
   // handle to audit manager, if audit topic is configured in scribe
   boost::shared_ptr<AuditManager> auditMgr;

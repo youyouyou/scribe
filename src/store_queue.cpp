@@ -48,7 +48,8 @@ StoreQueue::StoreQueue(const string& type, const string& category,
     checkPeriod(check_period),
     targetWriteSize(DEFAULT_TARGET_WRITE_SIZE),
     maxWriteInterval(DEFAULT_MAX_WRITE_INTERVAL),
-    mustSucceed(true) {
+    mustSucceed(true),
+    isAudit(false) {
 
   store = Store::createStore(this, type, category,
                             false, multiCategory);
@@ -69,7 +70,8 @@ StoreQueue::StoreQueue(const boost::shared_ptr<StoreQueue> example,
     checkPeriod(example->checkPeriod),
     targetWriteSize(example->targetWriteSize),
     maxWriteInterval(example->maxWriteInterval),
-    mustSucceed(example->mustSucceed) {
+    mustSucceed(example->mustSucceed),
+    isAudit(false) {
 
   store = example->copyStore(category);
   if (!store) {
@@ -252,8 +254,8 @@ void StoreQueue::threadMember() {
     }
 
     // perform audit specific task if it is an audit store
-    if (isAudit && (stop || 
-        (this_loop - last_handle_messages >= maxWriteInterval) ||
+    if (isAudit && auditMgr != NULL && auditMgr.get() != NULL && 
+       (stop || (this_loop - last_handle_messages >= maxWriteInterval) || 
         msgQueueSize >= targetWriteSize)) {
       auditMgr->performAuditTask();
     }
@@ -341,11 +343,6 @@ void StoreQueue::storeInitCommon() {
     pthread_mutex_init(&msgMutex, NULL);
     pthread_mutex_init(&hasWorkMutex, NULL);
     pthread_cond_init(&hasWorkCond, NULL);
-
-    // if this is an audit store then set audit flag to true
-    if (categoryHandled.compare(auditTopic) == 0) {
-      isAudit = true;
-    }
 
     pthread_create(&storeThread, NULL, threadStatic, (void*) this);
   }

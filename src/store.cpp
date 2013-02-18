@@ -182,10 +182,19 @@ void Store::auditMessagesSent(boost::shared_ptr<logentry_vector_t>& messages,
                          unsigned long offset, unsigned long count) {
   // audit these messages as sent ONLY if it is a primary store AND
   // message category is not audit AND audit store is configured in scribe
-  if (isPrimary && (categoryHandled.compare(auditTopic) != 0) &&
-      (storeQueue->getAuditManager() != NULL)) {
-    storeQueue->getAuditManager()->auditMessages(messages, categoryHandled,
-    offset, count, false);
+  try {
+    boost::shared_ptr<AuditManager> auditMgr = storeQueue->getAuditManager();
+    if (isPrimary && (categoryHandled.compare(auditTopic) != 0) &&
+        auditMgr != NULL && auditMgr.get() != NULL) {
+      auditMgr->auditMessages(messages, categoryHandled,
+      offset, count, false);
+    }
+  } catch (const std::exception& e) {
+    LOG_OPER("[%s] Failed to audit sent messages. Error <%s>",
+      categoryHandled.c_str(), e.what());
+  } catch (...) {
+    LOG_OPER("[%s] Failed to audit sent messages. Unexpected error.",
+      categoryHandled.c_str());
   }
 }
 
@@ -1430,8 +1439,8 @@ void BufferStore::configure(pStoreConf configuration, pStoreConf parent) {
       // set the primary flag for this store to true. This will be used later
       // to decide whether to audit the sent messages. 
       primaryStore->setStorePrimary(true);
-      LOG_OPER("Store of type [%s] and category [%s] set to primary",
-               type.c_str(),categoryHandled.c_str());
+      LOG_OPER("[%s] Store of type [%s] set to primary", categoryHandled.c_str(),
+               type.c_str());
     }
   }
 

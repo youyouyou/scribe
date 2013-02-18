@@ -27,6 +27,8 @@ struct AuditMsg {
   std::string topic;
   std::map<long, long> received;
   std::map<long, long> sent;
+  unsigned long long receivedCount;
+  unsigned long long sentCount;
   pthread_mutex_t mutex;
 };
 
