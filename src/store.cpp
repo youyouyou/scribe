@@ -528,7 +528,7 @@ void FileStoreBase::printStats() {
   if (!writeStats) {
     return;
   }
-
+  
   string filename(filePath);
   filename += "/scribe_stats";
 
@@ -541,25 +541,10 @@ void FileStoreBase::printStats() {
              categoryHandled.c_str(), filename.c_str(), fsType.c_str());
     // This isn't enough of a problem to change our status
     return;
-  }
-
-  /*time_t rawtime = time(NULL);
-  struct tm timeinfo;
-  localtime_r(&rawtime, &timeinfo);
-
-  ostringstream msg;
-  msg << timeinfo.tm_year + 1900  << '-'
-      << setw(2) << setfill('0') << timeinfo.tm_mon + 1 << '-'
-      << setw(2) << setfill('0') << timeinfo.tm_mday << '-'
-      << setw(2) << setfill('0') << timeinfo.tm_hour << ':'
-      << setw(2) << setfill('0') << timeinfo.tm_min;
-
-  msg << " wrote <" << currentSize << "> bytes in <" << eventsWritten
-      << "> events to file <" << currentFilename << ">" << endl;
-
-  string log_str = msg.str();
-  LOG_OPER("[%s]", log_str.c_str());
-  stats_file->write(msg.str());*/
+  }  
+  
+  //scribe_stats should be created and message written if/when hdfs-append works
+  //stats_file->write(msg.str());
   stats_file->close();
 }
 
@@ -785,6 +770,9 @@ void FileStore::closeWriteFile() {
 
       string log_str = msg.str();
       LOG_OPER("[%s]", log_str.c_str());
+      
+      // the message that is logged here should be moved to printStats() to be
+      // appended to scribe_stats when hdfs append works.
     }
     // update stats
     g_Handler->incCounter(categoryHandled, fsType + "_wrote_num_messages", eventsWritten);
