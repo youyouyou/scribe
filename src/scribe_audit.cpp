@@ -1,3 +1,4 @@
+//  Copyright (c) 2007-2009 Facebook
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -10,6 +11,9 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
+//
+// See accompanying file LICENSE or visit the Scribe site at:
+// http://developers.facebook.com/scribe/
 //
 // @author Satish Mittal
 
@@ -35,6 +39,33 @@ const unsigned long long minTimestamp = 1356998400000LL;
 // constant string for file store tier name
 static const string fileStoreTier = "hdfs";
 
+/* 
+** The Audit Manager class encapsulates the message audit functionality 
+** within scribe. 
+**
+** An instance of this class is created by scribe at initialization time
+** if it finds a store with category "_audit" configured in the scribe
+** configuration file. This configuration can be used to turn on/off the
+** audit functionality within scribe. The scribe server holds a reference
+** to this instance and also passes it to all stores, including the ones
+** created at run-time.
+**
+** The Audit Manager class provides methods that can be used by various
+** threads to perform actions related to audit functionality:
+**
+** A) The methods auditMessage() and auditMessages() are called by Thrift
+** server threads and file/network store queue threads to audit the event 
+** that they have received/sent messages for a given topic. Note that these
+** methods update the audit counters within in-memory maps owned by this
+** class in a synchronized manner. The auditMessages() method can also audit
+** on behalf of file store tier when messages are sent by file store threads. 
+**
+** B) The method performAuditTask() is called only by the store queue thread
+** that scribe creates for the "_audit" category. This method periodically
+** iterates through in-memory audit maps, converts each entry into an
+** Audit instance and serializes the latter into a LogEntry instance. These
+** audit objects are written into the file location configured for "_audit".
+*/
 AuditManager::AuditManager(const shared_ptr<StoreQueue> pAuditStore) {
   auditStore = pAuditStore;
   auditRWMutex = scribe::concurrency::createReadWriteMutex();
@@ -72,6 +103,8 @@ AuditManager::~AuditManager() {
   } 
 }
 
+// This method audits the event that a message was received/sent for a given topic.
+// E.g. Thrift threads call this method when a message is received by scribe.
 void AuditManager::auditMessage(const LogEntry& entry, bool received) {
   // this store queue must be configured for audit topic 
   if (!auditStore->isAuditStore()) {
@@ -95,8 +128,8 @@ void AuditManager::auditMessage(const LogEntry& entry, bool received) {
   }
 
   // acquire read lock on auditRWMutex. This allows multiple threads to audit
-  // their messages concurrently when audit store queue thread is not attempting
-  // to write audit message.
+  // their messages concurrently when audit store queue thread is not performing 
+  // periodic task to generate audit messages from maps.
   auditRWMutex->acquireRead();
   
   try {
@@ -121,6 +154,11 @@ void AuditManager::auditMessage(const LogEntry& entry, bool received) {
   }
 }
 
+// This method audits the event that a batch of messages were received/sent for
+// a given topic. E.g. Network/file store threads call this method after they
+// successfully write a batch of messages to their stores. Additionally, this 
+// method also audits on behalf of file store tier when messages are sent by 
+// primary file store threads.
 void AuditManager::auditMessages(shared_ptr<logentry_vector_t>& messages, 
      unsigned long offset, unsigned long count, const string& category, bool received,
      bool auditFileStore, const string& filename) {
@@ -129,23 +167,23 @@ void AuditManager::auditMessages(shared_ptr<logentry_vector_t>& messages,
     return;
   }
 
-  // acquire read lock on auditRWMutex. This allows multiple threads to audit
-  // their messages concurrently when audit store queue thread is not attempting
-  // to write audit message.
+  // acquire read lock on auditRWMutex. This allows multiple threads to audit their
+  // messages concurrently when audit store queue thread is not performing periodic
+  // task to generate audit messages from maps.
   auditRWMutex->acquireRead();
 
   try {
     // get the audit message entry in audit map for the given category 
     shared_ptr<audit_msg_t> audit_msg = getAuditMsg(category);
 
-    // if file audit is enabled, get file audit message entry for given filename
+    // if file store audit is enabled, get file audit message entry for given filename
     shared_ptr<file_audit_msg_t> file_audit_msg;
     if (auditFileStore) {
       file_audit_msg = getFileAuditMsg(filename, category);
     }
 
     for (unsigned long index = offset; index < offset + count; index++) {
-      // get the timestamp of message and update the appropriate counter in audit msg
+      // get the timestamp of message
       unsigned long long tsKey = validateMessageAndGetTimestamp(*(messages->at(index)));
 
       // if tsKey is 0, then probably message doesn't have a valid header; hence skip it
@@ -155,8 +193,8 @@ void AuditManager::auditMessages(shared_ptr<logentry_vector_t>& messages,
       // update audit message counter for the given message
       updateAuditMessageCounter(audit_msg, tsKey, received);
 
-      // if file audit is enabled and messages are sent, update file audit counters 
-      // for given message
+      // if file store audit is enabled and messages are sent to file store, update 
+      // file audit counters for given message
       if (auditFileStore && file_audit_msg != NULL && file_audit_msg.get() != NULL
           && received == false) {
         updateFileAuditMessageCounter(file_audit_msg, tsKey);
@@ -178,9 +216,12 @@ void AuditManager::auditMessages(shared_ptr<logentry_vector_t>& messages,
   }
 }
 
+// Get the audit message entry in audit map for the given category. If the entry
+// is not found, this method adds an entry and returns it.
 shared_ptr<audit_msg_t> AuditManager::getAuditMsg(const string& category) {
   shared_ptr<audit_msg_t> audit_msg;
   audit_map_t::iterator audit_iter;
+  // search for the audit msg entry in audit map 
   if ((audit_iter = auditMap.find(category)) != auditMap.end()) {
     audit_msg = audit_iter->second;
   }
@@ -209,10 +250,13 @@ shared_ptr<audit_msg_t> AuditManager::getAuditMsg(const string& category) {
   return audit_msg;
 }
 
+// Get the file audit message entry in file audit map for the given filename/category.
+// If the entry is not found, this method adds an entry and returns it.
 shared_ptr<file_audit_msg_t> AuditManager::getFileAuditMsg(const string& filename,
       const string& category) {
   shared_ptr<file_audit_msg_t> file_audit_msg;
   file_audit_map_t::iterator file_audit_iter;
+  // search for the file audit msg entry in file audit map 
   if ((file_audit_iter = fileAuditMap.find(filename)) != fileAuditMap.end()) {
     file_audit_msg = file_audit_iter->second;
   }
@@ -229,7 +273,9 @@ shared_ptr<file_audit_msg_t> AuditManager::getFileAuditMsg(const string& filenam
       file_audit_msg = shared_ptr<file_audit_msg_t>(new file_audit_msg_t);
       file_audit_msg->topic = category;
       file_audit_msg->filename = filename;
+      // initialize the file closed flag to false
       file_audit_msg->fileClosed = false;
+      // initialize the received counter for this entry
       file_audit_msg->receivedCount = 0;
       // add file audit msg to audit map
       fileAuditMap[filename] = file_audit_msg;
@@ -239,9 +285,12 @@ shared_ptr<file_audit_msg_t> AuditManager::getFileAuditMsg(const string& filenam
   return file_audit_msg;
 }
 
+// This method updates the sent/received counter for the given message entry and its 
+// corresponding timestamp key in the sent/received map.
 void AuditManager::updateAuditMessageCounter(shared_ptr<audit_msg_t>& audit_msg,
        unsigned long long timestampKey, bool received) {
-  // acquire mutex to synchronize access to map and insert/increment counter
+  // acquire category level mutex to synchronize access to map and insert/increment 
+  // the received/sent counters.
   pthread_mutex_lock(&(audit_msg->mutex));
   if (received) {
     unsigned long long counter = audit_msg->received[timestampKey];
@@ -255,6 +304,9 @@ void AuditManager::updateAuditMessageCounter(shared_ptr<audit_msg_t>& audit_msg,
   pthread_mutex_unlock(&(audit_msg->mutex));
 }
 
+// This method updates the received counter for the given message entry and its 
+// corresponding timestamp key in the received map. This method will be called
+// only when messages are sent to a file store and auditFileStore flag is enabled.
 void AuditManager::updateFileAuditMessageCounter(shared_ptr<file_audit_msg_t>& file_audit_msg,
        unsigned long long timestampKey) {
   unsigned long long counter = file_audit_msg->received[timestampKey];
@@ -262,6 +314,8 @@ void AuditManager::updateFileAuditMessageCounter(shared_ptr<file_audit_msg_t>& f
   ++(file_audit_msg->receivedCount);
 }
 
+// This method audits the event that the given file is closed. This would allow audit 
+// store thread to generate audit message for this file. 
 void AuditManager::auditFileClosed(const std::string& filename) {
   // acquire read lock
   RWGuard rwMonitor(*auditRWMutex);
@@ -273,7 +327,8 @@ void AuditManager::auditFileClosed(const std::string& filename) {
     file_audit_msg = file_audit_iter->second;
   }
 
-  // file audit entry should be present in map if messages were writen to this file
+  // file audit entry should be present in map if messages were writen to this file.
+  // Note that in case of empty files there won't be any entry in the file audit map.
   if (file_audit_msg == NULL) {
     return;
   }
@@ -282,6 +337,8 @@ void AuditManager::auditFileClosed(const std::string& filename) {
   file_audit_msg->fileClosed = true;
 }
 
+// This method checks whether the given message has a valid header. If a valid header is
+// found, this method returns timestamp key else returns 0.
 unsigned long long AuditManager::validateMessageAndGetTimestamp(const LogEntry& entry) {
   // assuming that logEntry message is of the format:
   // <version><magic bytes><timestamp><message size><message>
@@ -299,13 +356,20 @@ unsigned long long AuditManager::validateMessageAndGetTimestamp(const LogEntry& 
     return 0;
   }
 
-  // now validate magic bytes
-  if ((((unsigned char)data[1]) != magicBytes[0]) || (((unsigned char)data[2]) != magicBytes[1]) ||
+  // now validate magic bytes. Note that in C++ there is no byte datatype.
+  // Hence we need to cast each char to unsigned char to get the unsigned 
+  // value for comparison.
+  if ((((unsigned char)data[1]) != magicBytes[0]) || 
+      (((unsigned char)data[2]) != magicBytes[1]) ||
       (((unsigned char)data[3]) != magicBytes[2])) {
     return 0;
   }
 
-  // now get timestamp  bytes
+  // now get long timestamp value. This involves left shift each char to its 
+  // appropriate position. Note that each intermediate long after left shift 
+  // will have leading bits set to that of the leading bit of each char (0/1). 
+  // Hence we need to clear them using mask [0xff]. The same strategy is used 
+  // in Thrift deserialization and Java as well (see java.io.Bits.getLong()).
   unsigned long long timestamp =
     ((long)(data[4]  & 0xff) << 56) |
     ((long)(data[5]  & 0xff) << 48) |
@@ -321,7 +385,7 @@ unsigned long long AuditManager::validateMessageAndGetTimestamp(const LogEntry& 
     return 0;
   }
 
-  // now validate message size
+  // now validate that message size must be same as the length of message payload
   int size =
     ((int)(data[12] & 0xff) << 24) |
     ((int)(data[13] & 0xff) << 16) |
@@ -331,11 +395,19 @@ unsigned long long AuditManager::validateMessageAndGetTimestamp(const LogEntry& 
     return 0;
   }
 
+  // If a valid header is found, convert the timestamp to a key that can be used 
+  // to update the counter in received/sent map. The key is calculated based on 
+  // window size audit config. E.g. if window size is 60 seconds, then all messages 
+  // whose generation timestamp lie within 12:00 and 12:59 would be counted in the
+  // bucket with key as 12:00
   return timestamp - timestamp % (windowSize * 1000);
 }
 
+// This method is called by audit store thread periodically to generate audit messages
+// for all categories/file stores and add them to message queue.
 void AuditManager::performAuditTask() {
-  // find current time in millis. This time will be set in audit messages for all topics.
+  // find the current time in millis. This time will be set in audit messages
+  // generated for all topics/file stores.
   struct timeval tv;
   gettimeofday(&tv, NULL);
   long timeInMillis = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
@@ -343,13 +415,14 @@ void AuditManager::performAuditTask() {
   // acquire write lock on auditRWMutex using RWGuard 
   RWGuard rwMonitor(*auditRWMutex, true);
 
-  // create a LogEntry instance from audit message per store and add it to message queue
+  // Iterate through audit map; create a LogEntry instance from each audit message 
+  // entry per topic and add it to message queue
   try {
     shared_ptr<audit_msg_t> audit_msg;
     audit_map_t::iterator audit_iter;
     for (audit_iter = auditMap.begin(); audit_iter != auditMap.end(); audit_iter++) {
       audit_msg = audit_iter->second;
-      // skip auditing if received & sent maps are empty
+      // skip auditing if received & sent maps are both empty
       if (audit_msg->received.size() == 0 && audit_msg->sent.size() == 0)
         continue;
 
@@ -376,7 +449,8 @@ void AuditManager::performAuditTask() {
     LOG_OPER("[Audit] Store thread failed to perform message audit task. Unexpected error");
   }
 
-  // create a LogEntry instance for each file audit message and add it to message queue
+  // Iterate through file audit map; create a LogEntry instance for each file audit
+  // entry if the file is closed  and add it to message queue
   try {
     shared_ptr<file_audit_msg_t> file_audit_msg;
     file_audit_map_t::iterator file_audit_iter = fileAuditMap.begin();
@@ -411,6 +485,8 @@ void AuditManager::performAuditTask() {
   }
 }
 
+// This method serializes the audit message entry and sets it as the message payload
+// of a logEntry instance. This instance will be later added in the audit thread queue.
 shared_ptr<LogEntry> AuditManager::serializeAuditMsg(shared_ptr<audit_msg_t>& audit_msg, 
     long timeInMillis) {
   // create an instance of Thrift AuditMessage from the given audit_msg
@@ -437,6 +513,8 @@ shared_ptr<LogEntry> AuditManager::serializeAuditMsg(shared_ptr<audit_msg_t>& au
   return entry; 
 }
 
+// This method serializes the file audit message entry and sets it as the message payload
+// of a logEntry instance. This instance will be later added in the audit thread queue.
 shared_ptr<LogEntry> AuditManager::serializeFileAuditMsg(shared_ptr<file_audit_msg_t>& file_audit_msg,
     long timeInMillis) {
   // create an instance of Thrift AuditMessage from the given file_audit_msg

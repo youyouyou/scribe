@@ -543,17 +543,29 @@ bool scribeHandler::throttleDeny(int num_messages) {
 
 void scribeHandler::stopStores() {
   setStatus(STOPPING);
+  // In the first phase, stop all stores other than audit store, followed by
+  // stopping the audit store, if any. This is needed to ensure that all audit
+  // messages created by all stores get flushed before server shutdown.
   shared_ptr<store_list_t> store_list;
   for (store_list_t::iterator store_iter = defaultStores.begin();
       store_iter != defaultStores.end(); ++store_iter) {
-    if (!(*store_iter)->isModelStore()) {
+    if (!(*store_iter)->isModelStore() && 
+        !(*store_iter)->isAuditStore()) {
       (*store_iter)->stop();
     }
   }
+  stopCategoryMap(categories);
+  stopCategoryMap(category_prefixes);
+
+  // Now check if audit store is present and close it.
+  if (auditStore != NULL && auditStore.get() != NULL) {
+    auditStore->stop();
+  }
+
+  // In the second phase, clear the default store list and category maps.
   defaultStores.clear();
   deleteCategoryMap(categories);
   deleteCategoryMap(category_prefixes);
-
 }
 
 void scribeHandler::shutdown() {
@@ -942,12 +954,38 @@ shared_ptr<StoreQueue> scribeHandler::configureStoreCategory(
   if (category.compare(auditTopic) == 0) {
     auditMgr = shared_ptr<AuditManager>(new AuditManager(pstore));
     pstore->setAuditStore(true);
+    auditStore = pstore;
     LOG_OPER("[%s] Initialized audit manager", category.c_str()); 
   }
 
   return pstore;
 }
 
+// stop all stores except audit store in cats
+void scribeHandler::stopCategoryMap(category_map_t& cats) {
+  for (category_map_t::iterator cat_iter = cats.begin();
+       cat_iter != cats.end();
+       ++cat_iter) {
+    shared_ptr<store_list_t> pstores = cat_iter->second;
+    if (!pstores) {
+      throw std::logic_error("stopCategoryMap: "
+          "iterator in category map holds null pointer");
+    }
+    for (store_list_t::iterator store_iter = pstores->begin();
+         store_iter != pstores->end();
+         ++store_iter) {
+      if (!*store_iter) {
+        throw std::logic_error("stopCategoryMap: "
+            "iterator in store map holds null pointer");
+      }
+
+      if (!(*store_iter)->isModelStore() && 
+          !(*store_iter)->isAuditStore()) {
+        (*store_iter)->stop();
+      }
+    } // for each store
+  } // for each category
+}
 
 // delete everything in cats
 void scribeHandler::deleteCategoryMap(category_map_t& cats) {
@@ -955,22 +993,6 @@ void scribeHandler::deleteCategoryMap(category_map_t& cats) {
        cat_iter != cats.end();
        ++cat_iter) {
     shared_ptr<store_list_t> pstores = cat_iter->second;
-    if (!pstores) {
-      throw std::logic_error("deleteCategoryMap: "
-          "iterator in category map holds null pointer");
-    }
-    for (store_list_t::iterator store_iter = pstores->begin();
-         store_iter != pstores->end();
-         ++store_iter) {
-      if (!*store_iter) {
-        throw std::logic_error("deleteCategoryMap: "
-            "iterator in store map holds null pointer");
-      }
-
-      if (!(*store_iter)->isModelStore()) {
-        (*store_iter)->stop();
-      }
-    } // for each store
     pstores->clear();
   } // for each category
   cats.clear();

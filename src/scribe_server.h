@@ -101,7 +101,11 @@ class scribeHandler : virtual public scribe::thrift::scribeIf,
   unsigned long long maxQueueSize;
   StoreConf config;
   bool newThreadPerCategory;
+ 
+  // scribe server holds references to audit manager instance and the
+  // corresponding audit store instance
   boost::shared_ptr<AuditManager> auditMgr;
+  boost::shared_ptr<StoreQueue> auditStore;
 
   /* mutex to syncronize access to scribeHandler.
    * A single mutex is fine since it only needs to be locked in write mode
@@ -117,6 +121,7 @@ class scribeHandler : virtual public scribe::thrift::scribeIf,
 
  protected:
   bool throttleDeny(int num_messages); // returns true if overloaded
+  void stopCategoryMap(category_map_t& cats);
   void deleteCategoryMap(category_map_t& cats);
   const char* statusAsString(facebook::fb303::fb_status new_status);
   bool createCategoryFromModel(const std::string &category,
