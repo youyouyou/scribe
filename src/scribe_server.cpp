@@ -36,6 +36,7 @@ using namespace std;
 using boost::shared_ptr;
 
 shared_ptr<scribeHandler> g_Handler;
+volatile sig_atomic_t stopFlag = 0;
 
 #define DEFAULT_CHECK_PERIOD       5
 #define DEFAULT_MAX_MSG_PER_SECOND 0
@@ -46,10 +47,27 @@ shared_ptr<scribeHandler> g_Handler;
 static string overall_category = "scribe_overall";
 static string log_separator = ":";
 
-void sig_handler(int sig) {
-    LOG_OPER("Terminating gracefully...");
-    /// notify shutdown
-    g_Handler->shutdown();
+// This method is the sigaction handler registered for SIGINT/SIGTERM signals.
+// It simply sets the stopFlag to 1 and returns. The scribe shutdown thread
+// will find the flag set in its loop and perform graceful shutdown.
+void sigact_handler(int sig, siginfo_t* siginfo, void* context) {
+  stopFlag = 1;
+}
+
+// The scribe shutdown handler that will be executed by a separate thread.
+// This method periodically checks whether the stopFlag is set to 1, in
+// which case it performs graceful shutdown and retuns.
+void* shutdownHandler(void* ptr) {
+  while (true) {
+    if (stopFlag == 1) {
+      LOG_OPER("Terminating gracefully...");
+      // perform shutdown
+      g_Handler->performShutdown();
+      return NULL;
+    } else {
+      sleep(1);
+    }
+  }
 }
 
 void hup_handler(int sig) {
@@ -58,6 +76,19 @@ void hup_handler(int sig) {
 
 void print_usage(const char* program_name) {
   cout << "Usage: " << program_name << " [-p port] [-c config_file]" << endl;
+}
+
+// This method performs actual server shutdown. First it stops all store threads 
+// and then it calls TNonBlockingServer::stop().
+void scribeHandler::performShutdown() {
+  RWGuard monitor(*scribeHandlerLock, true);
+  stopStores();
+  // calling stop to allow thrift to clean up client states and exit
+  server->stop();
+  // commenting stopServer() because server->stop() will eventually
+  // break the event loop and we will fall off the main function
+  // hence exiting.
+  // scribe::stopServer();
 }
 
 void scribeHandler::incCounter(string category, string counter) {
@@ -79,9 +110,20 @@ void scribeHandler::incCounter(string counter, long amount) {
 
 int main(int argc, char **argv) {
 
-    void (*old_siginth)(int) = NULL;
+    /*void (*old_siginth)(int) = NULL;
     void (*old_sigtermh)(int) = NULL;
-    void (*old_sighuph)(int) = NULL;
+    void (*old_sighuph)(int) = NULL;*/
+
+  struct sigaction new_sa, old_sa;
+  new_sa.sa_sigaction = &sigact_handler;
+  new_sa.sa_flags = SA_RESTART | SA_SIGINFO;
+  if (sigaction(SIGTERM, &new_sa, &old_sa) < 0) {
+    LOG_OPER("ERROR: Failed to register sigaction handler");
+    return -1;
+  }
+
+  pthread_t shutdownThread;
+  pthread_create(&shutdownThread, NULL, shutdownHandler, NULL);
 
   try {
     /* Increase number of fds */
@@ -127,18 +169,18 @@ int main(int argc, char **argv) {
     g_Handler = shared_ptr<scribeHandler>(new scribeHandler(port, config_file));
     g_Handler->initialize();
 
-    old_siginth = signal(SIGINT, sig_handler);
+    /*old_siginth = signal(SIGINT, sig_handler);
     old_sigtermh = signal(SIGTERM, sig_handler);
-    old_sighuph = signal(SIGHUP, hup_handler);
+    old_sighuph = signal(SIGHUP, hup_handler);*/
     scribe::startServer(); // never returns
 
   } catch(const std::exception& e) {
     LOG_OPER("Exception in main: %s", e.what());
   }
 
-  if (old_siginth) { signal(SIGINT, old_siginth); }
+  /*if (old_siginth) { signal(SIGINT, old_siginth); }
   if (old_sigtermh) { signal(SIGTERM, old_sigtermh); }
-  if (old_sighuph) { signal(SIGHUP, old_sighuph); }
+  if (old_sighuph) { signal(SIGHUP, old_sighuph); }*/
 
   LOG_OPER("scribe server exiting");
   return 0;
@@ -315,7 +357,6 @@ bool scribeHandler::throttleRequest(const vector<LogEntry>&  messages) {
   // Also note that we always check all categories, not just the ones in this request.
   // This is a simplification based on the assumption that most Log() calls contain most
   // categories.
-  unsigned long long max_count = 0;
   for (category_map_t::iterator cat_iter = categories.begin();
        cat_iter != categories.end();
        ++cat_iter) {
@@ -568,15 +609,11 @@ void scribeHandler::stopStores() {
   deleteCategoryMap(category_prefixes);
 }
 
+// This method is invoked through scribe_ctrl stop script command. It simply 
+// sets the stopFlag to 1 and returns. The scribe shutdown thread will find 
+// the flag set in its loop and perform graceful shutdown. 
 void scribeHandler::shutdown() {
-  RWGuard monitor(*scribeHandlerLock, true);
-  stopStores();
-  // calling stop to allow thrift to clean up client states and exit
-  server->stop();
-  // commenting stopServer() because server->stop() will eventually
-  // break the event loop and we will fall off the main function
-  // hence exiting.
-  // scribe::stopServer();
+  stopFlag = 1;
 }
 
 void scribeHandler::reinitialize() {
@@ -968,15 +1005,21 @@ void scribeHandler::stopCategoryMap(category_map_t& cats) {
        ++cat_iter) {
     shared_ptr<store_list_t> pstores = cat_iter->second;
     if (!pstores) {
-      throw std::logic_error("stopCategoryMap: "
+      // log an error message to ensure graceful shutdown instead of
+      // throwing exception in the middle of shutdown.
+      LOG_OPER("ERROR: stopCategoryMap: "
           "iterator in category map holds null pointer");
+      continue;
     }
     for (store_list_t::iterator store_iter = pstores->begin();
          store_iter != pstores->end();
          ++store_iter) {
       if (!*store_iter) {
-        throw std::logic_error("stopCategoryMap: "
+        // log an error message to ensure graceful shutdown instead of
+        // throwing exception in the middle of shutdown.
+        LOG_OPER("stopCategoryMap: "
             "iterator in store map holds null pointer");
+        continue;
       }
 
       if (!(*store_iter)->isModelStore() && 
