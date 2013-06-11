@@ -660,8 +660,8 @@ void scribeHandler::stopStores() {
 }
 
 // This method is invoked through scribe_ctrl stop script command. It simply 
-// sets the stopFlag to 1 and returns. The scribe shutdown thread will find 
-// the flag set in its loop and perform graceful shutdown. 
+// sets the stopFlag to 1 and returns. The scribe signal handler thread will 
+// find the flag set in its loop and perform graceful shutdown. 
 void scribeHandler::shutdown() {
   stopFlag = 1;
 }

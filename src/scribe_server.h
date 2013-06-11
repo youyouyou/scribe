@@ -77,8 +77,8 @@ class scribeHandler : virtual public scribe::thrift::scribeIf,
     return maxConn;
   }
 
-  // this needs to be public for the shutdown thread handler to invoke it, but
-  // no one else should ever call it.
+  // this needs to be public for the scribe signal handler thread handler to invoke it,
+  // but no one else should ever call it.
   void performShutdown();
 
  private:
