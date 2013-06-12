@@ -52,10 +52,10 @@ static string log_separator = ":";
 // signals. It simply sets stopFlag/hupFlag to 1 and returns. The scribe signal
 // handler thread will check the flags in its loop and take respective action. 
 void sigact_handler(int sig, siginfo_t* siginfo, void* context) {
-  if (siginfo->si_signo == 2 || siginfo->si_signo == 15) {
+  if (siginfo->si_signo == SIGINT || siginfo->si_signo == SIGTERM) {
     // if signal is SIGINT or SIGTERM, set stopFlag to 1
     stopFlag = 1;
-  } else if (siginfo->si_signo == 1) {
+  } else if (siginfo->si_signo == SIGHUP) {
     // if signal is SIGHUP then set the hupFlag to 1
     hupFlag = 1;
   }
