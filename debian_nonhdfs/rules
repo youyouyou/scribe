@@ -11,7 +11,7 @@
 
 override_dh_auto_configure:
 	[ -f configure ] || ./bootstrap.sh
-	dh_auto_configure -- LIBS="-lboost_thread-mt" --with-thriftpath=/usr --with-fb303path=/usr
+	dh_auto_configure -- CPPFLAGS="-I/usr/lib/jvm/java-1.6.0-openjdk/include -DHAVE_INTTYPES_H -DHAVE_NETINET_IN_H -DBOOST_FILESYSTEM_VERSION=2" LIBS="-lboost_system-mt -lboost_filesystem-mt -lboost_thread-mt" --with-thriftpath=/usr --with-fb303path=/usr
 
 %:
 	dh  $@
