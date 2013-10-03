@@ -1865,7 +1865,7 @@ NetworkStore::NetworkStore(StoreQueue* storeq,
     configmod(NULL),
     opened(false),
     lastServiceCheck(0),
-    avgResetInterval(0),
+    baseResetInterval(0),
     resetIntervalRange(0),
     resetInterval(0),
     lastResetTime(0) {
@@ -1941,23 +1941,24 @@ void NetworkStore::configure(pStoreConf configuration, pStoreConf parent) {
   }
 
   if (configuration->getString("reset_interval", temp)) {
-    avgResetInterval = getTimeInSeconds(temp);
+    baseResetInterval = getTimeInSeconds(temp);
   }
   if (configuration->getString("reset_interval_range", temp)) {
     resetIntervalRange = getTimeInSeconds(temp);
   }
   // if connection reset is enabled, initialize reset settings 
-  if (avgResetInterval > 0) {
-    LOG_OPER("[%s] Average connection reset interval: [%d] seconds, reset interval range: [%d] seconds",
-      categoryHandled.c_str(), (int) avgResetInterval, (int) resetIntervalRange);
+  if (baseResetInterval > 0) {
+    LOG_OPER("[%s] Base connection reset interval: [%d] seconds, reset interval range: [%d] seconds",
+      categoryHandled.c_str(), (int) baseResetInterval, (int) resetIntervalRange);
     lastResetTime = time(NULL);
-    resetInterval = avgResetInterval + rand() % resetIntervalRange;
+    resetInterval = baseResetInterval + rand() % resetIntervalRange;
     LOG_OPER("[%s] Next connection reset interval is set to: [%d] seconds", 
       categoryHandled.c_str(), (int) resetInterval);
   }
 }
 
-// assuming timeStr ends with (w/d/h/m/s), find time in seconds
+// assuming timeStr is a numeric string that ends with 0 or 1 character
+// out of (w/d/h/m/s), calculate time in seconds
 time_t NetworkStore::getTimeInSeconds(std::string& timeStr) {
   char* endptr;
   time_t timePeriod = strtol(timeStr.c_str(), &endptr, 10);
@@ -2027,7 +2028,7 @@ void NetworkStore::periodicCheck() {
         
         // update lastResetTime and resetInterval
         lastResetTime = now;
-        resetInterval = avgResetInterval + rand() % resetIntervalRange;
+        resetInterval = baseResetInterval + rand() % resetIntervalRange;
         LOG_OPER("[%s] Next connection reset interval is set to: [%d] seconds", 
           categoryHandled.c_str(), (int) resetInterval);
         
@@ -2146,13 +2147,13 @@ shared_ptr<Store> NetworkStore::copy(const std::string &category) {
   store->remotePort = remotePort;
   store->serviceName = serviceName;
 
-  store->avgResetInterval = avgResetInterval;
+  store->baseResetInterval = baseResetInterval;
   store->resetIntervalRange = resetIntervalRange;
 
-  if (avgResetInterval > 0) {
-    LOG_OPER("[%s] Average connection reset interval: [%d] seconds, reset interval range: [%d] seconds",
-      category.c_str(), (int) avgResetInterval, (int) resetIntervalRange);
-    store->resetInterval = avgResetInterval + rand() % resetIntervalRange;
+  if (baseResetInterval > 0) {
+    LOG_OPER("[%s] Base connection reset interval: [%d] seconds, reset interval range: [%d] seconds",
+      category.c_str(), (int) baseResetInterval, (int) resetIntervalRange);
+    store->resetInterval = baseResetInterval + rand() % resetIntervalRange;
     store->lastResetTime = time(NULL);
     LOG_OPER("[%s] Next connection reset interval is set to: [%d] seconds",
       category.c_str(), (int) store->resetInterval); 
