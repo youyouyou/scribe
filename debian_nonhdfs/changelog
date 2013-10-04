@@ -1,8 +1,8 @@
-scribe-server-orig (0.5) precise; urgency=low
+scribe-server-orig (0.4.3) lucid; urgency=low
 
-  * Make changes in scribe to build on ubuntu12.04 (precise)
+  * Implement scribe connection reset feature
 
- -- Platform Engineering <platform-engg@inmobi.com>  Mon, 23 Sep 2013 17:03:00  +0530
+ -- Platform Engineering <platform-engg@inmobi.com>  Tue, 03 Oct 2013 18:16:00  +0530
 
 scribe-server-orig (0.4.2) lucid; urgency=low
 
