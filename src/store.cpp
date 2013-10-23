@@ -1951,7 +1951,8 @@ void NetworkStore::configure(pStoreConf configuration, pStoreConf parent) {
     LOG_OPER("[%s] Base connection reset interval: [%d] seconds, reset interval range: [%d] seconds",
       categoryHandled.c_str(), (int) baseResetInterval, (int) resetIntervalRange);
     lastResetTime = time(NULL);
-    resetInterval = baseResetInterval + rand() % resetIntervalRange;
+    // if reset interval range is <=0, then ignore it 
+    resetInterval = (resetIntervalRange <= 0) ? baseResetInterval : baseResetInterval + rand() % resetIntervalRange;
     LOG_OPER("[%s] Next connection reset interval is set to: [%d] seconds", 
       categoryHandled.c_str(), (int) resetInterval);
   }
@@ -2028,7 +2029,8 @@ void NetworkStore::periodicCheck() {
         
         // update lastResetTime and resetInterval
         lastResetTime = now;
-        resetInterval = baseResetInterval + rand() % resetIntervalRange;
+        // if reset interval range is <=0, then ignore it 
+        resetInterval = (resetIntervalRange <= 0) ? baseResetInterval : baseResetInterval + rand() % resetIntervalRange;
         LOG_OPER("[%s] Next connection reset interval is set to: [%d] seconds", 
           categoryHandled.c_str(), (int) resetInterval);
         
@@ -2153,7 +2155,8 @@ shared_ptr<Store> NetworkStore::copy(const std::string &category) {
   if (baseResetInterval > 0) {
     LOG_OPER("[%s] Base connection reset interval: [%d] seconds, reset interval range: [%d] seconds",
       category.c_str(), (int) baseResetInterval, (int) resetIntervalRange);
-    store->resetInterval = baseResetInterval + rand() % resetIntervalRange;
+    // if reset interval range is <=0, then ignore it 
+    store->resetInterval = (resetIntervalRange <= 0) ? baseResetInterval : baseResetInterval + rand() % resetIntervalRange;
     store->lastResetTime = time(NULL);
     LOG_OPER("[%s] Next connection reset interval is set to: [%d] seconds",
       category.c_str(), (int) store->resetInterval); 
