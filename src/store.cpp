@@ -1868,7 +1868,7 @@ NetworkStore::NetworkStore(StoreQueue* storeq,
     baseResetInterval(0),
     resetIntervalRange(0),
     resetInterval(0),
-    lastResetTime(0) {
+    lastOpenedTime(0) {
   // we can't open the connection until we get configured
 
   // the bool for opened ensures that we don't make duplicate
@@ -1946,15 +1946,9 @@ void NetworkStore::configure(pStoreConf configuration, pStoreConf parent) {
   if (configuration->getString("reset_interval_range", temp)) {
     resetIntervalRange = getTimeInSeconds(temp);
   }
-  // if connection reset is enabled, initialize reset settings 
   if (baseResetInterval > 0) {
     LOG_OPER("[%s] Base connection reset interval: [%d] seconds, reset interval range: [%d] seconds",
       categoryHandled.c_str(), (int) baseResetInterval, (int) resetIntervalRange);
-    lastResetTime = time(NULL);
-    // if reset interval range is <=0, then ignore it 
-    resetInterval = (resetIntervalRange <= 0) ? baseResetInterval : baseResetInterval + rand() % resetIntervalRange;
-    LOG_OPER("[%s] Next connection reset interval is set to: [%d] seconds", 
-      categoryHandled.c_str(), (int) resetInterval);
   }
 }
 
@@ -2014,26 +2008,22 @@ void NetworkStore::periodicCheck() {
     }
   }
 
-  // if reset interval is configured, check if connection needs to be reset now
-  if (resetInterval > 0) {
+  // if connection exists and reset is configured, check if connection needs to be reset
+  if (opened && resetInterval > 0) {
     time_t now = time(NULL);
-    if (now - lastResetTime >= resetInterval) {
-      LOG_OPER("[%s] Connection reset: closing old connection", categoryHandled.c_str());
+    if (now - lastOpenedTime >= resetInterval) {
+      LOG_OPER("[%s] Connection reset: closing existing connection", categoryHandled.c_str());
       // close the existing connection
       close();
 
-      // open a new connection
+      // open a new connection. If open fails for any reason, further reset will not trigger until
+      // connection is reopened by retry_interval attempts. If network store is contained within
+      // buffer store, the latter will detect connection break when handleMessages() fails to write 
+      // messages over broken connection and will change state to DISCONNECTED. The periodicCheck()
+      // of buffer store will subsequently perform retry attempts to open new connection. 
       if (open()) {
         // successfully opened
         LOG_OPER("[%s] Connection reset: opened new connection", categoryHandled.c_str());
-        
-        // update lastResetTime and resetInterval
-        lastResetTime = now;
-        // if reset interval range is <=0, then ignore it 
-        resetInterval = (resetIntervalRange <= 0) ? baseResetInterval : baseResetInterval + rand() % resetIntervalRange;
-        LOG_OPER("[%s] Next connection reset interval is set to: [%d] seconds", 
-          categoryHandled.c_str(), (int) resetInterval);
-        
         //increment counter for number of reset connections
         g_Handler->incCounter(categoryHandled, "connection_resets");
       }
@@ -2112,6 +2102,16 @@ bool NetworkStore::open() {
   } else {
     setStatus("Failed to connect");
   }
+
+  // if connection is opened and reset is configured, update reset settings 
+  if (opened && baseResetInterval > 0) {
+    lastOpenedTime = time(NULL);
+    // if reset interval range is <=0, then ignore it 
+    resetInterval = (resetIntervalRange <= 0) ? baseResetInterval : 
+      baseResetInterval + rand() % resetIntervalRange;
+    LOG_OPER("[%s] Next connection reset interval is set to: [%d] seconds", 
+      categoryHandled.c_str(), (int) resetInterval);
+  }
   return opened;
 }
 
@@ -2151,16 +2151,6 @@ shared_ptr<Store> NetworkStore::copy(const std::string &category) {
 
   store->baseResetInterval = baseResetInterval;
   store->resetIntervalRange = resetIntervalRange;
-
-  if (baseResetInterval > 0) {
-    LOG_OPER("[%s] Base connection reset interval: [%d] seconds, reset interval range: [%d] seconds",
-      category.c_str(), (int) baseResetInterval, (int) resetIntervalRange);
-    // if reset interval range is <=0, then ignore it 
-    store->resetInterval = (resetIntervalRange <= 0) ? baseResetInterval : baseResetInterval + rand() % resetIntervalRange;
-    store->lastResetTime = time(NULL);
-    LOG_OPER("[%s] Next connection reset interval is set to: [%d] seconds",
-      category.c_str(), (int) store->resetInterval); 
-  }
 
   return copied;
 }
