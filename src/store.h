@@ -429,7 +429,7 @@ class NetworkStore : public Store {
   time_t baseResetInterval;  // base connection reset time in seconds
   time_t resetIntervalRange;  // random backoff interval in seconds
   time_t resetInterval;  // current reset interval calcuated in seconds
-  time_t lastResetTime;  // time when the connection was last reset 
+  time_t lastOpenedTime;  // time when the connection was last opened 
 
  private:
   // disallow copy, assignment, and empty construction
