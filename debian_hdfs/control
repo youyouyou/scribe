@@ -8,6 +8,6 @@ Homepage: <insert the upstream URL, if relevant>
 
 Package: scribe-server-hdfs-orig
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, inmobi-techplatform-libthrift-dev, inmobi-techplatform-libfb303, inmobi-techplatform-thrift-compiler, libboost-thread-dev (>=1.46)
 Description: scribe server with HDFS support, installs in /usr
  <insert long description, indented with spaces>
