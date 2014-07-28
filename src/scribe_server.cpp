@@ -507,7 +507,6 @@ void scribeHandler::addMessage(
 
   int numstores = 0;
 
-  // Add message to store_list
   for (store_list_t::iterator store_iter = store_list->begin();
 	  store_iter != store_list->end(); ++store_iter) {
 	++numstores;
@@ -910,14 +909,32 @@ bool scribeHandler::configureStore(pStoreConf store_conf, int *numstores) {
     return false;
   }
   else if (single_category) {
-    // configure single store
-    shared_ptr<StoreQueue> result =
-      configureStoreCategory(store_conf, category_list[0], model);
-
-    if (result == NULL) {
-      return false;
+    // TODO  create multiple store queues
+    unsigned long num_store_threads;
+    store_conf->getUnsigned("num_store_threads", num_store_threads);
+    if (!num_store_threads || num_store_threads <= 0) {
+      ostringstream ostr;
+      ostr << "";
+      std::string thread_name = ostr.str();
+      shared_ptr<StoreQueue> result =
+          configureStoreCategory(store_conf, category_list[0], model, thread_name);
+      if (result == NULL) {
+        return false;
+      }
+    } else {
+      for (std::size_t i = 0; i < num_store_threads; i++) {
+        ostringstream ostr;
+        ostr << "thread-" << i;
+        std::string thread_name = ostr.str();
+        LOG_OPER("Store Queue name [%s] for [%s] category", thread_name.c_str(), category_list[0].c_str());
+        shared_ptr<StoreQueue> result =
+            configureStoreCategory(store_conf, category_list[0], model, thread_name);
+        if (result == NULL) {
+          LOG_OPER("Unable to create store queue [%s] for [%s] catgeory", thread_name.c_str(), category_list[0].c_str());
+          return false;
+        }
+      }
     }
-
     (*numstores)++;
   } else {
     // configure multiple stores
