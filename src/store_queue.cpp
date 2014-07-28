@@ -38,7 +38,8 @@ void* threadStatic(void *this_ptr) {
 }
 
 StoreQueue::StoreQueue(const string& type, const string& category,
-                       unsigned check_period, bool is_model, bool multi_category)
+                       string& thread_name, unsigned check_period,
+                       bool is_model, bool multi_category)
   : msgQueueSize(0),
     hasWork(false),
     stopping(false),
@@ -46,12 +47,13 @@ StoreQueue::StoreQueue(const string& type, const string& category,
     multiCategory(multi_category),
     categoryHandled(category),
     checkPeriod(check_period),
+    threadName(thread_name),
     targetWriteSize(DEFAULT_TARGET_WRITE_SIZE),
     maxWriteInterval(DEFAULT_MAX_WRITE_INTERVAL),
     mustSucceed(true),
     isAudit(false) {
 
-  store = Store::createStore(this, type, category,
+  store = Store::createStore(this, type, category, thread_name,
                             false, multiCategory);
   if (!store) {
     throw std::runtime_error("createStore failed in StoreQueue constructor. Invalid type?");
@@ -59,21 +61,23 @@ StoreQueue::StoreQueue(const string& type, const string& category,
   storeInitCommon();
 }
 
+//TODO pass thread name for creating stores from model
 StoreQueue::StoreQueue(const boost::shared_ptr<StoreQueue> example,
-                       const std::string &category)
+                       const std::string &category, std::string &thread_name)
   : msgQueueSize(0),
     hasWork(false),
     stopping(false),
     isModel(false),
     multiCategory(example->multiCategory),
     categoryHandled(category),
+    threadName(thread_name),
     checkPeriod(example->checkPeriod),
     targetWriteSize(example->targetWriteSize),
     maxWriteInterval(example->maxWriteInterval),
     mustSucceed(example->mustSucceed),
     isAudit(false) {
 
-  store = example->copyStore(category);
+  store = example->copyStore(category, thread_name);
   if (!store) {
     throw std::runtime_error("createStore failed copying model store");
   }
@@ -178,14 +182,17 @@ void StoreQueue::open() {
   }
 }
 
-shared_ptr<Store> StoreQueue::copyStore(const std::string &category) {
-  return store->copy(category);
+shared_ptr<Store> StoreQueue::copyStore(const std::string &category, std::string& thread_name) {
+  return store->copy(category, thread_name);
 }
 
 std::string StoreQueue::getCategoryHandled() {
   return categoryHandled;
 }
 
+std::string StoreQueue::getThreadName() {
+  return threadName;
+}
 
 std::string StoreQueue::getStatus() {
   return store->getStatus();

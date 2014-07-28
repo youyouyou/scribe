@@ -37,19 +37,22 @@ class AuditManager;
 class StoreQueue {
  public:
   StoreQueue(const std::string& type, const std::string& category,
-             unsigned check_period, bool is_model=false, bool multi_category=false);
+             std::string& thread_name,
+             unsigned check_period,
+             bool is_model=false, bool multi_category=false);
   StoreQueue(const boost::shared_ptr<StoreQueue> example,
-             const std::string &category);
+             const std::string &category, std::string &thread_name);
   virtual ~StoreQueue();
 
   void addMessage(logentry_ptr_t entry);
   void configureAndOpen(pStoreConf configuration); // closes first if already open
   void open();                                     // closes first if already open
   void stop();
-  boost::shared_ptr<Store> copyStore(const std::string &category);
+  boost::shared_ptr<Store> copyStore(const std::string &category, std::string &thread_name);
   std::string getStatus(); // An empty string means OK, anything else is an error
   std::string getBaseType();
   std::string getCategoryHandled();
+  std::string getThreadName();
   bool isModelStore() { return isModel;}
 
   // this needs to be public for the thread creation to get to it,
@@ -122,6 +125,7 @@ class StoreQueue {
 
   // configuration
   std::string        categoryHandled;  // what category this store is handling
+  std::string        threadName;       // thread name
   time_t             checkPeriod;      // how often to call periodicCheck in seconds
   unsigned long long targetWriteSize;  // in bytes
   time_t             maxWriteInterval; // in seconds
