@@ -500,6 +500,43 @@ void scribeHandler::addMessage(
   }
 }
 
+// Add this message to every least sized store in list
+void scribeHandler::addMessage(
+  const LogEntry& entry,
+  const shared_ptr<store_list_t>& store_list) {
+
+  int numstores = 0;
+
+  // Add message to store_list
+  for (store_list_t::iterator store_iter = store_list->begin();
+	  store_iter != store_list->end(); ++store_iter) {
+	++numstores;
+  }
+
+  if (numstores) {
+	//TODO TODO check this method
+	// find the least sized store queue add the
+	int minIndex = 0;
+	size_t min_queue_size = (*store_list)[0]->getSize();
+	for (int i = 1; i < store_list->size(); i++) {
+	  if (min_queue_size > (*store_list)[i]->getSize()) {
+	    minIndex = i;
+	    min_queue_size = (*store_list)[i]->getSize();
+	  }
+	}
+	// add message to store queue
+	boost::shared_ptr<LogEntry> ptr(new LogEntry);
+	ptr->category = entry.category;
+	ptr->message = entry.message;
+
+	(*store_list)[minIndex]->addMessage(ptr);
+
+	incCounter(entry.category, "received good");
+  } else {
+	incCounter(entry.category, "received bad");
+  }
+}
+
 void scribeHandler::auditMessageReceived(const LogEntry& entry) {
   // if audit manager is configured and message category itself is not audit,
   // then audit this message as received
@@ -580,7 +617,7 @@ ResultCode scribeHandler::Log(const vector<LogEntry>&  messages) {
 
     // audit this message as received
     auditMessageReceived(*msg_iter);
-    
+
     // Log this message
     addMessage(*msg_iter, store_list);
   }
