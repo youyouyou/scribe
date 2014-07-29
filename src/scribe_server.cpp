@@ -405,6 +405,7 @@ bool scribeHandler::throttleRequest(const vector<LogEntry>&  messages) {
     if (!pstores) {
       throw std::logic_error("throttle check: iterator in category map holds null pointer");
     }
+    bool throttle = true;
     for (store_list_t::iterator store_iter = pstores->begin();
          store_iter != pstores->end();
          ++store_iter) {
@@ -412,12 +413,20 @@ bool scribeHandler::throttleRequest(const vector<LogEntry>&  messages) {
         throw std::logic_error("throttle check: iterator in store map holds null pointer");
       } else {
         unsigned long long size = (*store_iter)->getSize();
+        if (size <= maxQueueSize) {
+         throttle = false;
+        }/*
         if (size > maxQueueSize) {
           LOG_OPER("throttle denying request for queue size <%llu>. It would exceed max queue size <%llu>", size, maxQueueSize);
           incCounter((*store_iter)->getCategoryHandled(), "denied for queue size");
           return true;
-        }
+        }*/
       }
+    }
+    if (throttle) {
+      //LOG_OPER("throttle denying request for queue size <%llu>. It would exceed max queue size <%llu>", size, maxQueueSize);
+      incCounter((*store_iter)->getCategoryHandled(), "denied for queue size");
+      return true;
     }
   }
 
@@ -919,9 +928,10 @@ bool scribeHandler::configureStore(pStoreConf store_conf, int *numstores) {
   }
   else if (single_category) {
     // TODO  create multiple store queues
-    unsigned long num_store_threads;
+    unsigned long int num_store_threads = -1;/*
     store_conf->getUnsigned("num_store_threads", num_store_threads);
-    if (!num_store_threads || num_store_threads <= 0) {
+    if (!num_store_threads || num_store_threads <= 0) {*/
+    if (!store_conf->getUnsigned("num_store_threads", num_store_threads)) {
       ostringstream ostr;
       ostr << "";
       std::string thread_name = ostr.str();
