@@ -252,7 +252,6 @@ void FileStoreBase::configure(pStoreConf configuration, pStoreConf parent) {
     filePath += "/" + subDirectory;
   }
 
-  //TODO TODO    create subdirectory with thread_name
   if (!isPrimary &&  !threadName.empty() && subDirectory.empty()) {
     filePath += "/" + threadName;
   }
@@ -391,8 +390,7 @@ void FileStoreBase::copyCommon(const FileStoreBase *base) {
     filePath += "/" + subDirectory;
   }
 
-  //TODO TODO    create subdirectory with thread_name
-  if (!isPrimary && subDirectory.empty()) {
+  if (!isPrimary && !threadName.empty() && subDirectory.empty()) {
     filePath += "/" + threadName;
   }
 
@@ -766,7 +764,6 @@ bool FileStore::openInternal(bool incrementFilename, struct tm* current_time) {
     }
 
 
-    //TODO TODO create directory for spooling
     if (!isPrimary && !threadName.empty()) {
       LOG_OPER("AAAAAAAA creating dirs [%s] filepath ", filePath.c_str());
       success = writeFile->createDirectory(filePath);

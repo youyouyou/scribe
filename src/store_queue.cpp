@@ -61,7 +61,6 @@ StoreQueue::StoreQueue(const string& type, const string& category,
   storeInitCommon();
 }
 
-//TODO pass thread name for creating stores from model
 StoreQueue::StoreQueue(const boost::shared_ptr<StoreQueue> example,
                        const std::string &category, std::string &thread_name)
   : msgQueueSize(0),
