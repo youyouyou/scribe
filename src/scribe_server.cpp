@@ -943,7 +943,7 @@ bool scribeHandler::configureStore(pStoreConf store_conf, int *numstores) {
     } else {
       for (std::size_t i = 0; i < num_store_threads; i++) {
         ostringstream ostr;
-        ostr << "thread-" << i;
+        ostr << "thread_" << i;
         std::string thread_name = ostr.str();
         LOG_OPER("Store Queue name [%s] for [%s] category", thread_name.c_str(), category_list[0].c_str());
         shared_ptr<StoreQueue> result =
