@@ -650,7 +650,6 @@ ResultCode scribeHandler::Log(const vector<LogEntry>&  messages) {
 
     // add the message to the least sized queue in case of multiple storeQueues
     if (!((*store_list)[0]->getThreadName()).empty()) {
-      LOG_OPER("AAAAAAAA adding message to least sized store queue ");
       addMessageToLeastSizedQueue(*msg_iter, store_list);
     } else {
       // Log this message
