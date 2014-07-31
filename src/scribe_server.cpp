@@ -926,7 +926,7 @@ bool scribeHandler::configureStore(pStoreConf store_conf, int *numstores) {
   }
   else if (single_category) {
     bool is_prefix_category = (!category.empty() &&
-			category[category.size() - 1] == '*' && !category_list);
+			category[category.size() - 1] == '*');
     bool is_default_category = (!category.empty() && category.compare("default") == 0);
 
     unsigned long int num_store_threads = -1;
@@ -967,7 +967,7 @@ bool scribeHandler::configureStore(pStoreConf store_conf, int *numstores) {
       return false;
     }
 
-    sostringstream ostr;
+    ostringstream ostr;
     ostr << "";
     std::string thread_name = ostr.str();
 
