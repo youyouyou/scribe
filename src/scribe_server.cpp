@@ -461,7 +461,8 @@ shared_ptr<store_list_t> scribeHandler::createNewCategory(
       shared_ptr<store_list_t> pstores = cat_prefix_iter->second;
       for (store_list_t::iterator store_iter = pstores->begin();
           store_iter != pstores->end(); ++store_iter) {
-    	//TODO
+        // currently we are not supporting multiple threads for the model categories.
+        // specify new thread name for each new store queue
         ostringstream ostr;
         ostr << "";
         std::string thread_name = ostr.str();
@@ -486,7 +487,8 @@ shared_ptr<store_list_t> scribeHandler::createNewCategory(
   if (store_list == NULL && !defaultStores.empty()) {
     for (store_list_t::iterator store_iter = defaultStores.begin();
         store_iter != defaultStores.end(); ++store_iter) {
-      //TODO  create multiple store queues
+      // currently we are not supporting multiple threads for the model categories.
+      // Specify a new threadName for each storeQueue thread in case of multi-thread
       ostringstream ostr;
       ostr << "";
       std::string thread_name = ostr.str();
@@ -543,7 +545,6 @@ void scribeHandler::addMessageToLeastSizedQueue(
   }
 
   if (numstores) {
-	//TODO TODO check this method
 	// find the least sized store queue add the
 	int minIndex = 0;
 	size_t min_queue_size = (*store_list)[0]->getSize();
@@ -647,8 +648,7 @@ ResultCode scribeHandler::Log(const vector<LogEntry>&  messages) {
     // audit this message as received
     auditMessageReceived(*msg_iter);
 
-    //TODO if the thread Name is not empty then call new api addMessage()
-    // get the thread name --> (*store_list)[0]->getThreadName
+    // add the message to the least sized queue in case of multiple storeQueues
     if (!((*store_list)[0]->getThreadName()).empty()) {
       LOG_OPER("AAAAAAAA adding message to least sized store queue ");
       addMessageToLeastSizedQueue(*msg_iter, store_list);
@@ -946,11 +946,13 @@ bool scribeHandler::configureStore(pStoreConf store_conf, int *numstores) {
     return false;
   }
   else if (single_category) {
-    // TODO  create multiple store queues
-    unsigned long int num_store_threads = -1;/*
-    store_conf->getUnsigned("num_store_threads", num_store_threads);
-    if (!num_store_threads || num_store_threads <= 0) {*/
-    if (!store_conf->getUnsigned("num_store_threads", num_store_threads) /* || (0 == category.compare("default"))*/) {
+    bool is_prefix_category = (!category.empty() &&
+			category[category.size() - 1] == '*' && !category_list);
+    bool is_default_category = (!category.empty() && category.compare("default") == 0);
+
+    unsigned long int num_store_threads = -1;
+    if (!store_conf->getUnsigned("num_store_threads", num_store_threads)
+      || is_default_category || is_prefix_category || (num_store_threads <= 0)) {
       ostringstream ostr;
       ostr << "";
       std::string thread_name = ostr.str();
@@ -986,8 +988,7 @@ bool scribeHandler::configureStore(pStoreConf store_conf, int *numstores) {
       return false;
     }
 
-    //TODO
-    ostringstream ostr;
+    sostringstream ostr;
     ostr << "";
     std::string thread_name = ostr.str();
 
