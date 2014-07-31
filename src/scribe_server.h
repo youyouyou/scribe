@@ -85,7 +85,6 @@ class scribeHandler : virtual public scribe::thrift::scribeIf,
   boost::shared_ptr<apache::thrift::server::TNonblockingServer> server;
 
   unsigned long checkPeriod; // periodic check interval for all contained stores
-  //unsigned long num_store_threads;
 
   // This map has an entry for each configured category.
   // Each of these entries is a map of type->StoreQueue.

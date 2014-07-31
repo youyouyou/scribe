@@ -168,7 +168,6 @@ class FileStoreBase : public Store {
   std::string subDirectory;
   std::string filePath;
   std::string baseFileName;
-  std::string threadNameAsSuffix;
   std::string baseSymlinkName;
   unsigned long maxSize;
   unsigned long maxWriteSize;
