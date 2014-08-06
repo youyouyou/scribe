@@ -763,7 +763,7 @@ bool FileStore::openInternal(bool incrementFilename, struct tm* current_time) {
       success = writeFile->createDirectory(filePath);
     }
 
-    if (!success && !isPrimary && !threadName.empty()) {
+    if (success && !isPrimary && !threadName.empty()) {
       success = writeFile->createDirectory(filePath);
     }
 
