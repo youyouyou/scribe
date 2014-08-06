@@ -484,57 +484,49 @@ void scribeHandler::addMessage(
 
   int numstores = 0;
 
-  // Add message to store_list
+  size_t min_queue_size = -1;
+  shared_ptr<StoreQueue> min_store_queue;
+  bool isMultiThreaded = false;
+  for (store_list_t::iterator store_iter = store_list->begin();
+         store_iter != store_list->end();
+         ++store_iter) {
+    if (!(*store_iter)->getThreadName().empty()) {
+      isMultiThreaded = true;
+    }
+    break;
+  }
+
+  // Find least sized queue in case if category store configured with multiple threads.
+  // Otherwise, simply add it to all the store queues in the sotre_list
   for (store_list_t::iterator store_iter = store_list->begin();
        store_iter != store_list->end();
        ++store_iter) {
-    ++numstores;
-    boost::shared_ptr<LogEntry> ptr(new LogEntry);
-    ptr->category = entry.category;
-    ptr->message = entry.message;
+    if (!isMultiThreaded) {
+      // add message to every store queue
+      boost::shared_ptr<LogEntry> ptr(new LogEntry);
+      ptr->category = entry.category;
+      ptr->message = entry.message;
 
-    (*store_iter)->addMessage(ptr);
+      (*store_iter)->addMessage(ptr);
+	} else {
+	  if (min_queue_size > (*store_iter)->getSize()) {
+        min_queue_size = (*store_iter)->getSize();
+        min_store_queue = shared_ptr<StoreQueue>(*store_iter);
+	  }
+    }
+    ++numstores;
   }
 
   if (numstores) {
+    if (isMultiThreaded) {
+      boost::shared_ptr<LogEntry> ptr(new LogEntry);
+      ptr->category = entry.category;
+      ptr->message = entry.message;
+      (*min_store_queue)->addMessage(ptr);
+    }
     incCounter(entry.category, "received good");
   } else {
     incCounter(entry.category, "received bad");
-  }
-}
-
-// Add this message to every least sized store in list
-void scribeHandler::addMessageToLeastSizedQueue(
-  const LogEntry& entry,
-  const shared_ptr<store_list_t>& store_list) {
-
-  int numstores = 0;
-
-  for (store_list_t::iterator store_iter = store_list->begin();
-	  store_iter != store_list->end(); ++store_iter) {
-	++numstores;
-  }
-
-  if (numstores) {
-	// find the least sized store queue add the
-	int minIndex = 0;
-	size_t min_queue_size = (*store_list)[0]->getSize();
-	for (int i = 1; i < store_list->size(); i++) {
-	  if (min_queue_size > (*store_list)[i]->getSize()) {
-	    minIndex = i;
-	    min_queue_size = (*store_list)[i]->getSize();
-	  }
-	}
-	// add message to store queue
-	boost::shared_ptr<LogEntry> ptr(new LogEntry);
-	ptr->category = entry.category;
-	ptr->message = entry.message;
-
-	(*store_list)[minIndex]->addMessage(ptr);
-
-	incCounter(entry.category, "received good");
-  } else {
-	incCounter(entry.category, "received bad");
   }
 }
 
@@ -619,13 +611,8 @@ ResultCode scribeHandler::Log(const vector<LogEntry>&  messages) {
     // audit this message as received
     auditMessageReceived(*msg_iter);
 
-    // add the message to the least sized queue in case of multiple storeQueues
-    if (!((*store_list)[0]->getThreadName()).empty()) {
-      addMessageToLeastSizedQueue(*msg_iter, store_list);
-    } else {
-      // Log this message
-      addMessage(*msg_iter, store_list);
-    }
+    // Log this message
+    addMessage(*msg_iter, store_list);
   }
 
   result = OK;
