@@ -522,7 +522,7 @@ void scribeHandler::addMessage(
       boost::shared_ptr<LogEntry> ptr(new LogEntry);
       ptr->category = entry.category;
       ptr->message = entry.message;
-      (*min_store_queue)->addMessage(ptr);
+      min_store_queue->addMessage(ptr);
     }
     incCounter(entry.category, "received good");
   } else {
