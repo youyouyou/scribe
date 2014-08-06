@@ -252,7 +252,7 @@ void FileStoreBase::configure(pStoreConf configuration, pStoreConf parent) {
     filePath += "/" + subDirectory;
   }
 
-  if (!isPrimary &&  !threadName.empty() && subDirectory.empty()) {
+  if (!isPrimary &&  !threadName.empty()) {
     filePath += "/" + threadName;
   }
 
@@ -390,7 +390,7 @@ void FileStoreBase::copyCommon(const FileStoreBase *base) {
     filePath += "/" + subDirectory;
   }
 
-  if (!isPrimary && !threadName.empty() && subDirectory.empty()) {
+  if (!isPrimary && !threadName.empty()) {
     filePath += "/" + threadName;
   }
 
@@ -633,7 +633,7 @@ void FileStoreBase::setHostNameSubDir() {
   }
   // append threadName to the subdirectory
   if (!threadName.empty()) {
-    subDirectory = hoststring + "_" +threadName;
+    subDirectory = hoststring + "_" + threadName;
   }
 }
 
@@ -763,7 +763,7 @@ bool FileStore::openInternal(bool incrementFilename, struct tm* current_time) {
       success = writeFile->createDirectory(filePath);
     }
 
-    if (!isPrimary && !threadName.empty()) {
+    if (!success && !isPrimary && !threadName.empty()) {
       success = writeFile->createDirectory(filePath);
     }
 

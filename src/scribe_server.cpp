@@ -909,7 +909,7 @@ bool scribeHandler::configureStore(pStoreConf store_conf, int *numstores) {
 
     unsigned long int num_store_threads = -1;
     if (!store_conf->getUnsigned("num_store_threads", num_store_threads)
-      || is_default_category || is_prefix_category || (num_store_threads <= 0)) {
+      || is_default_category || is_prefix_category || (num_store_threads <= 1)) {
       shared_ptr<StoreQueue> result =
           configureStoreCategory(store_conf, category_list[0], model, empty_string);
       if (result == NULL) {
@@ -924,7 +924,7 @@ bool scribeHandler::configureStore(pStoreConf store_conf, int *numstores) {
         shared_ptr<StoreQueue> result =
             configureStoreCategory(store_conf, category_list[0], model, thread_name);
         if (result == NULL) {
-          LOG_OPER("Unable to create store queue [%s] for [%s] catgeory", thread_name.c_str(), category_list[0].c_str());
+          LOG_OPER("Unable to create store queue [%s] for [%s] category", thread_name.c_str(), category_list[0].c_str());
           return false;
         }
       }
