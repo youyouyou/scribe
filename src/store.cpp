@@ -87,7 +87,7 @@ Store::createStore(StoreQueue* storeq, const string& type,
     return shared_ptr<Store>(new FileStore(storeq, category, multi_category,
                                           readable, thread_name));
   } else if (0 == type.compare("buffer")) {
-    return shared_ptr<Store>(new BufferStore(storeq,category, multi_category, thread_name));
+    return shared_ptr<Store>(new BufferStore(storeq, category, multi_category, thread_name));
   } else if (0 == type.compare("network")) {
     return shared_ptr<Store>(new NetworkStore(storeq, category, multi_category));
   } else if (0 == type.compare("bucket")) {
@@ -1870,7 +1870,7 @@ std::string BufferStore::getStatus() {
 NetworkStore::NetworkStore(StoreQueue* storeq,
                           const string& category,
                           bool multi_category,
-                  		  const string &thread_name)
+                          const string &thread_name)
   : Store(storeq, category, "network", multi_category),
     useConnPool(false),
     serviceBased(false),

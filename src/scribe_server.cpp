@@ -508,7 +508,7 @@ void scribeHandler::addMessage(
       ptr->message = entry.message;
 
       (*store_iter)->addMessage(ptr);
-	} else {
+    } else {
 	  if (min_queue_size > (*store_iter)->getSize()) {
         min_queue_size = (*store_iter)->getSize();
         min_store_queue = shared_ptr<StoreQueue>(*store_iter);
