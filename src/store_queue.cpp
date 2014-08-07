@@ -54,8 +54,8 @@ StoreQueue::StoreQueue(const string& type, const string& category,
     mustSucceed(true),
     isAudit(false) {
 
-  store = Store::createStore(this, type, category, thread_name,
-                            false, multiCategory);
+  store = Store::createStore(this, type, category,
+                            false, multiCategory, thread_name);
   if (!store) {
     throw std::runtime_error("createStore failed in StoreQueue constructor. Invalid type?");
   }

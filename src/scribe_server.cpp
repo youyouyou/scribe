@@ -351,7 +351,7 @@ bool scribeHandler::createCategoryFromModel(
   shared_ptr<StoreQueue> pstore;
   if (newThreadPerCategory) {
     // Create a new thread/StoreQueue for this category
-    pstore = shared_ptr<StoreQueue>(new StoreQueue(model, category, thread_name));
+    pstore = shared_ptr<StoreQueue>(new StoreQueue(model, category));
     LOG_OPER("[%s] Creating new category store from model %s",
              category.c_str(), model->getCategoryHandled().c_str());
 
@@ -919,10 +919,10 @@ bool scribeHandler::configureStore(pStoreConf store_conf, int *numstores) {
       for (std::size_t i = 0; i < num_store_threads; i++) {
         ostringstream ostr;
         ostr << "thread_" << i;
-        std::string thread_name = ostr.str();
+        const std::string thread_name = ostr.str();
         LOG_OPER("Store Queue name [%s] for [%s] category", thread_name.c_str(), category_list[0].c_str());
         shared_ptr<StoreQueue> result =
-            configureStoreCategory(store_conf, category_list[0], model, thread_name);
+            configureStoreCategory(store_conf, category_list[0], model, false, thread_name);
         if (result == NULL) {
           LOG_OPER("Unable to create store queue [%s] for [%s] category", thread_name.c_str(), category_list[0].c_str());
           return false;
@@ -942,12 +942,8 @@ bool scribeHandler::configureStore(pStoreConf store_conf, int *numstores) {
       return false;
     }
 
-    ostringstream ostr;
-    ostr << "";
-    std::string thread_name = ostr.str();
-
     // create model so that we can create stores as copies of this model
-    model = configureStoreCategory(store_conf, categories, model, thread_name, true);
+    model = configureStoreCategory(store_conf, categories, model, true);
 
     if (model == NULL) {
       string errormsg("Bad config - could not create store for category: ");
@@ -960,7 +956,7 @@ bool scribeHandler::configureStore(pStoreConf store_conf, int *numstores) {
     vector<string>::iterator iter;
     for (iter = category_list.begin(); iter < category_list.end(); iter++) {
        shared_ptr<StoreQueue> result =
-         configureStoreCategory(store_conf, *iter, model, thread_name);
+         configureStoreCategory(store_conf, *iter, model);
 
       if (!result) {
         return false;
@@ -1039,8 +1035,8 @@ shared_ptr<StoreQueue> scribeHandler::configureStoreCategory(
       is_model = newThreadPerCategory && categories;
 
       pstore =
-        shared_ptr<StoreQueue>(new StoreQueue(type, store_name, thread_name, checkPeriod,
-                                              is_model, multi_category));
+        shared_ptr<StoreQueue>(new StoreQueue(type, store_name, checkPeriod,
+                                              is_model, multi_category, thread_name));
     }
   } catch (...) {
     pstore.reset();

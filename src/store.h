@@ -266,7 +266,8 @@ class ThriftFileStore : public FileStoreBase {
                   bool multi_category);
   ~ThriftFileStore();
 
-  boost::shared_ptr<Store> copy(const std::string &category);
+  boost::shared_ptr<Store> copy(const std::string &category,
+		  const std::string &thread_name = empty_str);
   bool handleMessages(boost::shared_ptr<logentry_vector_t> messages);
   bool open();
   bool isOpen();
@@ -399,10 +400,11 @@ class NetworkStore : public Store {
  public:
   NetworkStore(StoreQueue* storeq,
                const std::string& category,
-               bool multi_category);
+               bool multi_category, const std::string& thread_name=empty_str);
   ~NetworkStore();
 
-  boost::shared_ptr<Store> copy(const std::string &category);
+  boost::shared_ptr<Store> copy(const std::string &category,
+		  const std::string &thread_name = empty_str);
   bool handleMessages(boost::shared_ptr<logentry_vector_t> messages);
   bool open();
   bool isOpen();
@@ -461,7 +463,8 @@ class BucketStore : public Store {
               bool multi_category);
   ~BucketStore();
 
-  boost::shared_ptr<Store> copy(const std::string &category);
+  boost::shared_ptr<Store> copy(const std::string &category,
+		  const std::string &thread_name = empty_str);
   bool handleMessages(boost::shared_ptr<logentry_vector_t> messages);
   bool open();
   bool isOpen();
@@ -513,7 +516,8 @@ class NullStore : public Store {
             bool multi_category);
   virtual ~NullStore();
 
-  boost::shared_ptr<Store> copy(const std::string &category);
+  boost::shared_ptr<Store> copy(const std::string &category,
+		  const std::string &thread_name = empty_str);
   bool open();
   bool isOpen();
   void configure(pStoreConf configuration, pStoreConf parent);
@@ -549,7 +553,8 @@ class MultiStore : public Store {
              bool multi_category);
   ~MultiStore();
 
-  boost::shared_ptr<Store> copy(const std::string &category);
+  boost::shared_ptr<Store> copy(const std::string &category,
+		  const std::string &thread_name = empty_str);
   bool open();
   bool isOpen();
   void configure(pStoreConf configuration, pStoreConf parent);
