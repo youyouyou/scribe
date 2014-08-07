@@ -38,8 +38,9 @@ void* threadStatic(void *this_ptr) {
 }
 
 StoreQueue::StoreQueue(const string& type, const string& category,
-                       string& thread_name, unsigned check_period,
-                       bool is_model, bool multi_category)
+                       unsigned check_period,
+                       bool is_model, bool multi_category,
+                       const string& thread_name)
   : msgQueueSize(0),
     hasWork(false),
     stopping(false),
@@ -62,7 +63,7 @@ StoreQueue::StoreQueue(const string& type, const string& category,
 }
 
 StoreQueue::StoreQueue(const boost::shared_ptr<StoreQueue> example,
-                       const std::string &category, std::string &thread_name)
+                       const std::string &category, const std::string &thread_name)
   : msgQueueSize(0),
     hasWork(false),
     stopping(false),
@@ -181,7 +182,8 @@ void StoreQueue::open() {
   }
 }
 
-shared_ptr<Store> StoreQueue::copyStore(const std::string &category, std::string& thread_name) {
+shared_ptr<Store> StoreQueue::copyStore(const std::string &category,
+		const std::string& thread_name) {
   return store->copy(category, thread_name);
 }
 

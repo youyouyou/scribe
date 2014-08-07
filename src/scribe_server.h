@@ -30,6 +30,7 @@
 
 typedef std::vector<boost::shared_ptr<StoreQueue> > store_list_t;
 typedef std::map<std::string, boost::shared_ptr<store_list_t> > category_map_t;
+static const std::string emptyStr = "";
 
 class scribeHandler : virtual public scribe::thrift::scribeIf,
                               public facebook::fb303::FacebookBase {
@@ -131,13 +132,13 @@ class scribeHandler : virtual public scribe::thrift::scribeIf,
   const char* statusAsString(facebook::fb303::fb_status new_status);
   bool createCategoryFromModel(const std::string &category,
                                const boost::shared_ptr<StoreQueue> &model,
-                               std::string& thread_name);
+                               const std::string& thread_name=emptyStr);
   boost::shared_ptr<StoreQueue>
     configureStoreCategory(pStoreConf store_conf,
                            const std::string &category,
                            const boost::shared_ptr<StoreQueue> &model,
-                           std::string& thread_name,
-                           bool category_list=false);
+                           bool category_list=false,
+                           const std::string& thread_name=emptyStr);
   bool configureStore(pStoreConf store_conf, int* num_stores);
   void stopStores();
   bool throttleRequest(const std::vector<scribe::thrift::LogEntry>&  messages);
