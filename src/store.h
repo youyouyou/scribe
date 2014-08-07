@@ -43,7 +43,7 @@ enum roll_period_t {
   ROLL_DAILY,
   ROLL_OTHER
 };
-
+static const std::string empty_str = "";
 
 /*
  * Abstract class to define the interface for a store
@@ -56,15 +56,15 @@ class Store {
     createStore(StoreQueue* storeq,
                 const std::string& type, const std::string& category,
                 bool readable = false, bool multi_category = false,
-                const std::string& thread_name);
+                const std::string& thread_name = empty_str);
 
   Store(StoreQueue* storeq, const std::string& category,
         const std::string &type, bool multi_category = false,
-        const std::string& thread_name);
+        const std::string& thread_name = empty_str);
   virtual ~Store();
 
   virtual boost::shared_ptr<Store> copy(const std::string &category,
-		  const std::string& thread_name) = 0;
+		  const std::string& thread_name = empty_str) = 0;
   virtual bool open() = 0;
   virtual bool isOpen() = 0;
   virtual void configure(pStoreConf configuration, pStoreConf parent);
@@ -127,7 +127,7 @@ class FileStoreBase : public Store {
   FileStoreBase(StoreQueue* storeq,
                 const std::string& category,
                 const std::string &type, bool multi_category,
-                const std::string& thread_name);
+                const std::string& thread_name = empty_str);
   ~FileStoreBase();
 
   virtual void copyCommon(const FileStoreBase *base);
@@ -213,10 +213,11 @@ class FileStore : public FileStoreBase {
  public:
   FileStore(StoreQueue* storeq, const std::string& category,
             bool multi_category, bool is_buffer_file = false,
-            const std::string& thread_name);
+            const std::string& thread_name = empty_str);
   ~FileStore();
 
-  boost::shared_ptr<Store> copy(const std::string &category, const std::string& thread_name);
+  boost::shared_ptr<Store> copy(const std::string &category,
+		  const std::string& thread_name = empty_str);
   bool handleMessages(boost::shared_ptr<logentry_vector_t> messages);
   bool isOpen();
   void configure(pStoreConf configuration, pStoreConf parent);
@@ -306,10 +307,11 @@ class BufferStore : public Store {
  public:
   BufferStore(StoreQueue* storeq,
               const std::string& category,
-              bool multi_category, const std::string& thread_name);
+              bool multi_category, const std::string& thread_name = empty_str);
   ~BufferStore();
 
-  boost::shared_ptr<Store> copy(const std::string &category, const std::string & thread_name);
+  boost::shared_ptr<Store> copy(const std::string &category,
+		  const std::string & thread_name = empty_str);
   bool handleMessages(boost::shared_ptr<logentry_vector_t> messages);
   bool open();
   bool isOpen();
@@ -594,7 +596,8 @@ class CategoryStore : public Store {
                 const std::string& name, bool multiCategory);
   ~CategoryStore();
 
-  boost::shared_ptr<Store> copy(const std::string &category);
+  boost::shared_ptr<Store> copy(const std::string &category,
+		  const std::string &thread_name = empty_str);
   bool open();
   bool isOpen();
   void configure(pStoreConf configuration, pStoreConf parent);
