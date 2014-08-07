@@ -976,7 +976,7 @@ shared_ptr<StoreQueue> scribeHandler::configureStoreCategory(
   const string &category,                      //category name
   const boost::shared_ptr<StoreQueue> &model,  //model to use (optional)
   bool category_list,                        //is a list of stores?
-  const string& thread_name) {                        //storeQueue name
+  const string& thread_name) {               //store thread name
 
   bool is_default = false;
   bool already_created = false;
