@@ -1007,7 +1007,7 @@ shared_ptr<StoreQueue> scribeHandler::configureStoreCategory(
     if (model != NULL) {
       // Create a copy of the model if we want a new thread per category
       if (newThreadPerCategory && !is_default && !is_prefix_category) {
-        pstore = shared_ptr<StoreQueue>(new StoreQueue(model, category, thread_name));
+        pstore = shared_ptr<StoreQueue>(new StoreQueue(model, category));
       } else {
         pstore = model;
         already_created = true;
