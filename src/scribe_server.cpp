@@ -908,23 +908,24 @@ bool scribeHandler::configureStore(pStoreConf store_conf, int *numstores) {
     if (!store_conf->getUnsigned("num_store_threads", num_store_threads)
       || is_default_category || is_prefix_category || (num_store_threads <= 1)) {
       shared_ptr<StoreQueue> result =
-        configureStoreCategory(store_conf, category_list[0], model);
+        configureStoreCategory(store_conf, category, model);
       if (result == NULL) {
         return false;
       }
     } else {
-      LOG_OPER("Configuring [%lu] store queues for [%s] ", num_store_threads, category_list[0].c_str());
+      const char* category_str = category.c_str();
+      LOG_OPER("Configuring [%lu] store queues for [%s] ", num_store_threads, category_str);
       for (std::size_t i = 0; i < num_store_threads; i++) {
         ostringstream ostr;
         ostr << "thread_" << i;
         const std::string thread_name = ostr.str();
         shared_ptr<StoreQueue> result = configureStoreCategory(store_conf,
-          category_list[0], model, false, thread_name);
+          category, model, false, thread_name);
         if (result == NULL) {
-          LOG_OPER("Unable to create store queue [%s] for [%s] category", thread_name.c_str(), category_list[0].c_str());
+          LOG_OPER("Unable to create store queue [%s] for [%s] category", thread_name.c_str(), category_str);
           return false;
         } else {
-          LOG_OPER("Configured a store queue with thread name [%s] for [%s] category", thread_name.c_str(), category_list[0].c_str());
+          LOG_OPER("Configured a store queue with thread name [%s] for [%s] category", thread_name.c_str(), category_str);
         }
       }
     }
