@@ -62,8 +62,7 @@ class Store {
         const std::string& thread_name = empty_string);
   virtual ~Store();
 
-  virtual boost::shared_ptr<Store> copy(const std::string &category,
-		  const std::string& thread_name = empty_string) = 0;
+  virtual boost::shared_ptr<Store> copy(const std::string &category) = 0;
   virtual bool open() = 0;
   virtual bool isOpen() = 0;
   virtual void configure(pStoreConf configuration, pStoreConf parent);
@@ -215,8 +214,7 @@ class FileStore : public FileStoreBase {
             const std::string& thread_name = empty_string);
   ~FileStore();
 
-  boost::shared_ptr<Store> copy(const std::string &category,
-		  const std::string& thread_name = empty_string);
+  boost::shared_ptr<Store> copy(const std::string &category);
   bool handleMessages(boost::shared_ptr<logentry_vector_t> messages);
   bool isOpen();
   void configure(pStoreConf configuration, pStoreConf parent);
@@ -265,8 +263,7 @@ class ThriftFileStore : public FileStoreBase {
                   bool multi_category);
   ~ThriftFileStore();
 
-  boost::shared_ptr<Store> copy(const std::string &category,
-		  const std::string &thread_name = empty_string);
+  boost::shared_ptr<Store> copy(const std::string &category);
   bool handleMessages(boost::shared_ptr<logentry_vector_t> messages);
   bool open();
   bool isOpen();
@@ -310,8 +307,7 @@ class BufferStore : public Store {
               bool multi_category, const std::string& thread_name = empty_string);
   ~BufferStore();
 
-  boost::shared_ptr<Store> copy(const std::string &category,
-		  const std::string & thread_name = empty_string);
+  boost::shared_ptr<Store> copy(const std::string &category);
   bool handleMessages(boost::shared_ptr<logentry_vector_t> messages);
   bool open();
   bool isOpen();
@@ -402,8 +398,7 @@ class NetworkStore : public Store {
                bool multi_category);
   ~NetworkStore();
 
-  boost::shared_ptr<Store> copy(const std::string &category,
-		  const std::string &thread_name = empty_string);
+  boost::shared_ptr<Store> copy(const std::string &category);
   bool handleMessages(boost::shared_ptr<logentry_vector_t> messages);
   bool open();
   bool isOpen();
@@ -462,8 +457,7 @@ class BucketStore : public Store {
               bool multi_category);
   ~BucketStore();
 
-  boost::shared_ptr<Store> copy(const std::string &category,
-		  const std::string &thread_name = empty_string);
+  boost::shared_ptr<Store> copy(const std::string &category);
   bool handleMessages(boost::shared_ptr<logentry_vector_t> messages);
   bool open();
   bool isOpen();
@@ -515,8 +509,7 @@ class NullStore : public Store {
             bool multi_category);
   virtual ~NullStore();
 
-  boost::shared_ptr<Store> copy(const std::string &category,
-		  const std::string &thread_name = empty_string);
+  boost::shared_ptr<Store> copy(const std::string &category);
   bool open();
   bool isOpen();
   void configure(pStoreConf configuration, pStoreConf parent);
@@ -552,8 +545,7 @@ class MultiStore : public Store {
              bool multi_category);
   ~MultiStore();
 
-  boost::shared_ptr<Store> copy(const std::string &category,
-		  const std::string &thread_name = empty_string);
+  boost::shared_ptr<Store> copy(const std::string &category);
   bool open();
   bool isOpen();
   void configure(pStoreConf configuration, pStoreConf parent);
@@ -600,8 +592,7 @@ class CategoryStore : public Store {
                 const std::string& name, bool multiCategory);
   ~CategoryStore();
 
-  boost::shared_ptr<Store> copy(const std::string &category,
-		  const std::string &thread_name = empty_string);
+  boost::shared_ptr<Store> copy(const std::string &category);
   bool open();
   bool isOpen();
   void configure(pStoreConf configuration, pStoreConf parent);

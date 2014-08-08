@@ -330,8 +330,7 @@ const char* scribeHandler::statusAsString(fb_status status) {
 
 // Should be called while holding a writeLock on scribeHandlerLock
 bool scribeHandler::createCategoryFromModel(
-  const string &category, const boost::shared_ptr<StoreQueue> &model,
-  const string&  thread_name) {
+  const string &category, const boost::shared_ptr<StoreQueue> &model) {
 
   // Make sure the category name is sane.
   try {
@@ -439,8 +438,6 @@ shared_ptr<store_list_t> scribeHandler::createNewCategory(
       shared_ptr<store_list_t> pstores = cat_prefix_iter->second;
       for (store_list_t::iterator store_iter = pstores->begin();
           store_iter != pstores->end(); ++store_iter) {
-        // Currently we are not supporting multiple threads for prefix model.
-        // Hence not passing any thread name
         createCategoryFromModel(category, *store_iter);
       }
       category_map_t::iterator cat_iter = categories.find(category);
@@ -461,8 +458,6 @@ shared_ptr<store_list_t> scribeHandler::createNewCategory(
   if (store_list == NULL && !defaultStores.empty()) {
     for (store_list_t::iterator store_iter = defaultStores.begin();
         store_iter != defaultStores.end(); ++store_iter) {
-      // currently we are not supporting multiple threads for default model.
-      // Hence not passing any thread name
       createCategoryFromModel(category, *store_iter);
     }
     category_map_t::iterator cat_iter = categories.find(category);

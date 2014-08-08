@@ -859,9 +859,9 @@ void FileStore::flush() {
   }
 }
 
-shared_ptr<Store> FileStore::copy(const std::string &category, const std::string &thread_name) {
+shared_ptr<Store> FileStore::copy(const std::string &category) {
   FileStore *store = new FileStore(storeQueue, category, multiCategory,
-                                   isBufferFile, thread_name);
+                                   isBufferFile);
   shared_ptr<Store> copied = shared_ptr<Store>(store);
 
   store->addNewlines = addNewlines;
@@ -1166,8 +1166,7 @@ ThriftFileStore::ThriftFileStore(StoreQueue* storeq,
 ThriftFileStore::~ThriftFileStore() {
 }
 
-shared_ptr<Store> ThriftFileStore::copy(const std::string &category,
-		const string &thread_name) {
+shared_ptr<Store> ThriftFileStore::copy(const std::string &category) {
   ThriftFileStore *store = new ThriftFileStore(storeQueue, category, multiCategory);
   shared_ptr<Store> copied = shared_ptr<Store>(store);
 
@@ -1562,8 +1561,8 @@ void BufferStore::flush() {
   }
 }
 
-shared_ptr<Store> BufferStore::copy(const std::string &category, const std::string &thread_name) {
-  BufferStore *store = new BufferStore(storeQueue, category, multiCategory, thread_name);
+shared_ptr<Store> BufferStore::copy(const std::string &category) {
+  BufferStore *store = new BufferStore(storeQueue, category, multiCategory);
   shared_ptr<Store> copied = shared_ptr<Store>(store);
 
   store->bufferSendRate = bufferSendRate;
@@ -1577,10 +1576,10 @@ shared_ptr<Store> BufferStore::copy(const std::string &category, const std::stri
   store->maxRandomOffset = maxRandomOffset;
   store->adaptiveBackoff = adaptiveBackoff;
 
-  store->primaryStore = primaryStore->copy(category, thread_name);
+  store->primaryStore = primaryStore->copy(category);
   // copy the primary status
   store->primaryStore->setStorePrimary(primaryStore->isStorePrimary());
-  store->secondaryStore = secondaryStore->copy(category, thread_name);
+  store->secondaryStore = secondaryStore->copy(category);
   return copied;
 }
 
@@ -2152,8 +2151,7 @@ bool NetworkStore::isOpen() {
   return opened;
 }
 
-shared_ptr<Store> NetworkStore::copy(const std::string &category,
-		const string &thread_name) {
+shared_ptr<Store> NetworkStore::copy(const std::string &category) {
   NetworkStore *store = new NetworkStore(storeQueue, category, multiCategory);
   shared_ptr<Store> copied = shared_ptr<Store>(store);
 
@@ -2589,8 +2587,7 @@ void BucketStore::periodicCheck() {
   }
 }
 
-shared_ptr<Store> BucketStore::copy(const std::string &category,
-		const string &thread_name) {
+shared_ptr<Store> BucketStore::copy(const std::string &category) {
   BucketStore *store = new BucketStore(storeQueue, category, multiCategory);
   shared_ptr<Store> copied = shared_ptr<Store>(store);
 
@@ -2778,8 +2775,7 @@ NullStore::NullStore(StoreQueue* storeq,
 NullStore::~NullStore() {
 }
 
-boost::shared_ptr<Store> NullStore::copy(const std::string &category,
-		const string &thread_name) {
+boost::shared_ptr<Store> NullStore::copy(const std::string &category) {
   NullStore *store = new NullStore(storeQueue, category, multiCategory);
   shared_ptr<Store> copied = shared_ptr<Store>(store);
   return copied;
@@ -2834,8 +2830,7 @@ MultiStore::MultiStore(StoreQueue* storeq,
 MultiStore::~MultiStore() {
 }
 
-boost::shared_ptr<Store> MultiStore::copy(const std::string &category,
-		const string &thread_name) {
+boost::shared_ptr<Store> MultiStore::copy(const std::string &category) {
   MultiStore *store = new MultiStore(storeQueue, category, multiCategory);
   store->report_success = this->report_success;
   boost::shared_ptr<Store> tmp_copy;
@@ -3013,8 +3008,7 @@ CategoryStore::CategoryStore(StoreQueue* storeq,
 CategoryStore::~CategoryStore() {
 }
 
-boost::shared_ptr<Store> CategoryStore::copy(const std::string &category,
-		const string &thread_name) {
+boost::shared_ptr<Store> CategoryStore::copy(const std::string &category) {
   CategoryStore *store = new CategoryStore(storeQueue, category, multiCategory);
 
   store->modelStore = modelStore->copy(category);
@@ -3116,7 +3110,7 @@ bool CategoryStore::handleMessages(boost::shared_ptr<logentry_vector_t> messages
 
     if (store_iter == stores.end()) {
       // Create new store for this category
-      store = modelStore->copy(category, threadName);
+      store = modelStore->copy(category);
       store->open();
       stores[category] = store;
     } else {
