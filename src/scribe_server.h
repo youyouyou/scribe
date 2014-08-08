@@ -145,9 +145,6 @@ class scribeHandler : virtual public scribe::thrift::scribeIf,
     createNewCategory(const std::string& category);
   void addMessage(const scribe::thrift::LogEntry& entry,
                   const boost::shared_ptr<store_list_t>& store_list);
-  void addMessageToLeastSizedQueue(const scribe::thrift::LogEntry& entry,
-                    const boost::shared_ptr<store_list_t>& store_list);
-  
   void auditMessageReceived(const scribe::thrift::LogEntry& entry);
   void configureAuditManagerInAllStores();
 };

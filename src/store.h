@@ -399,7 +399,7 @@ class NetworkStore : public Store {
  public:
   NetworkStore(StoreQueue* storeq,
                const std::string& category,
-               bool multi_category, const std::string& thread_name=empty_string);
+               bool multi_category);
   ~NetworkStore();
 
   boost::shared_ptr<Store> copy(const std::string &category,

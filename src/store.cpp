@@ -1869,8 +1869,7 @@ std::string BufferStore::getStatus() {
 
 NetworkStore::NetworkStore(StoreQueue* storeq,
                           const string& category,
-                          bool multi_category,
-                          const string &thread_name)
+                          bool multi_category)
   : Store(storeq, category, "network", multi_category),
     useConnPool(false),
     serviceBased(false),

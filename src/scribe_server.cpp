@@ -508,22 +508,24 @@ void scribeHandler::addMessage(
       ptr->message = entry.message;
 
       (*store_iter)->addMessage(ptr);
+      ++numstores;
     } else {
-      if (min_queue_size > (*store_iter)->getSize()) {
+      if (min_queue_size == -1 || min_queue_size > (*store_iter)->getSize()) {
         min_queue_size = (*store_iter)->getSize();
         min_store_queue = shared_ptr<StoreQueue>(*store_iter);
-	  }
+      }
     }
+  }
+
+  if (isMultiThreaded) {
+    boost::shared_ptr<LogEntry> ptr(new LogEntry);
+    ptr->category = entry.category;
+    ptr->message = entry.message;
+    min_store_queue->addMessage(ptr);
     ++numstores;
   }
 
   if (numstores) {
-    if (isMultiThreaded) {
-      boost::shared_ptr<LogEntry> ptr(new LogEntry);
-      ptr->category = entry.category;
-      ptr->message = entry.message;
-      min_store_queue->addMessage(ptr);
-    }
     incCounter(entry.category, "received good");
   } else {
     incCounter(entry.category, "received bad");
