@@ -439,7 +439,8 @@ shared_ptr<store_list_t> scribeHandler::createNewCategory(
       shared_ptr<store_list_t> pstores = cat_prefix_iter->second;
       for (store_list_t::iterator store_iter = pstores->begin();
           store_iter != pstores->end(); ++store_iter) {
-        // currently we are not supporting multiple threads for prefix model
+        // Currently we are not supporting multiple threads for prefix model.
+        // Hence not passing any thread name
         createCategoryFromModel(category, *store_iter);
       }
       category_map_t::iterator cat_iter = categories.find(category);
@@ -460,7 +461,8 @@ shared_ptr<store_list_t> scribeHandler::createNewCategory(
   if (store_list == NULL && !defaultStores.empty()) {
     for (store_list_t::iterator store_iter = defaultStores.begin();
         store_iter != defaultStores.end(); ++store_iter) {
-      // currently we are not supporting multiple threads for default model
+      // currently we are not supporting multiple threads for default model.
+      // Hence not passing any thread name
       createCategoryFromModel(category, *store_iter);
     }
     category_map_t::iterator cat_iter = categories.find(category);
@@ -494,8 +496,8 @@ void scribeHandler::addMessage(
     break;
   }
 
-  // Find least sized queue in case if category store configured with multiple threads.
-  // Otherwise, simply add it to all the store queues in the sotre_list
+  // If category store is configured with multiple threads, then add message to the least sized queue.
+  // Otherwise, simply add it to all the store queues in the store_list
   for (store_list_t::iterator store_iter = store_list->begin();
        store_iter != store_list->end();
        ++store_iter) {
@@ -507,7 +509,7 @@ void scribeHandler::addMessage(
 
       (*store_iter)->addMessage(ptr);
     } else {
-	  if (min_queue_size > (*store_iter)->getSize()) {
+      if (min_queue_size > (*store_iter)->getSize()) {
         min_queue_size = (*store_iter)->getSize();
         min_store_queue = shared_ptr<StoreQueue>(*store_iter);
 	  }
