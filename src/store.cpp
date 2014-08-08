@@ -838,6 +838,12 @@ void FileStore::closeWriteFile() {
       // appended to scribe_stats when hdfs append works.
     }
     // update stats
+    if (!threadName.empty()) {
+      g_Handler->incCounter(categoryHandled + "_" + threadName,
+          fsType + "_wrote_num_messages", eventsWritten);
+      g_Handler->incCounter(categoryHandled + "_" + threadName,
+          fsType + "_wrote_bytes", eventSize);
+    }
     g_Handler->incCounter(categoryHandled, fsType + "_wrote_num_messages", eventsWritten);
     g_Handler->incCounter(categoryHandled, fsType + "_wrote_bytes", eventSize);
     
