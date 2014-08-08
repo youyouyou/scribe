@@ -47,7 +47,6 @@ volatile sig_atomic_t hupFlag = 0;
 
 static string overall_category = "scribe_overall";
 static string log_separator = ":";
-static string empty_string = "";
 
 // This method is the sigaction handler registered for SIGINT/SIGTERM/SIGHUP
 // signals. It simply sets stopFlag/hupFlag to 1 and returns. The scribe signal
@@ -441,7 +440,7 @@ shared_ptr<store_list_t> scribeHandler::createNewCategory(
       for (store_list_t::iterator store_iter = pstores->begin();
           store_iter != pstores->end(); ++store_iter) {
         // currently we are not supporting multiple threads for prefix model
-        createCategoryFromModel(category, *store_iter, empty_string);
+        createCategoryFromModel(category, *store_iter);
       }
       category_map_t::iterator cat_iter = categories.find(category);
 
@@ -457,13 +456,12 @@ shared_ptr<store_list_t> scribeHandler::createNewCategory(
     cat_prefix_iter++;
   }
 
-
   // Then try creating a store if we have a default store defined
   if (store_list == NULL && !defaultStores.empty()) {
     for (store_list_t::iterator store_iter = defaultStores.begin();
         store_iter != defaultStores.end(); ++store_iter) {
       // currently we are not supporting multiple threads for default model
-      createCategoryFromModel(category, *store_iter, empty_string);
+      createCategoryFromModel(category, *store_iter);
     }
     category_map_t::iterator cat_iter = categories.find(category);
     if (cat_iter != categories.end()) {

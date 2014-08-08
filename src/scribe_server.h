@@ -30,7 +30,6 @@
 
 typedef std::vector<boost::shared_ptr<StoreQueue> > store_list_t;
 typedef std::map<std::string, boost::shared_ptr<store_list_t> > category_map_t;
-static const std::string empty_string = "";
 
 class scribeHandler : virtual public scribe::thrift::scribeIf,
                               public facebook::fb303::FacebookBase {

@@ -29,7 +29,7 @@
 class Store;
 class AuditManager;
 
-static const std::string empty_string_name = "";
+static const std::string empty_string = "";
 /*
  * This class implements a queue and a thread for dispatching
  * events to a store. It creates a store object of the requested
@@ -40,9 +40,9 @@ class StoreQueue {
   StoreQueue(const std::string& type, const std::string& category,
              unsigned check_period,
              bool is_model=false, bool multi_category=false,
-             const std::string& thread_name = empty_string_name);
+             const std::string& thread_name = empty_string);
   StoreQueue(const boost::shared_ptr<StoreQueue> example,
-             const std::string &category, const std::string &thread_name = empty_string_name);
+             const std::string &category, const std::string &thread_name = empty_string);
   virtual ~StoreQueue();
 
   void addMessage(logentry_ptr_t entry);
@@ -50,7 +50,7 @@ class StoreQueue {
   void open();                                     // closes first if already open
   void stop();
   boost::shared_ptr<Store> copyStore(const std::string &category,
-		  const std::string &thread_name = empty_string_name);
+		  const std::string &thread_name = empty_string);
   std::string getStatus(); // An empty string means OK, anything else is an error
   std::string getBaseType();
   std::string getCategoryHandled();
