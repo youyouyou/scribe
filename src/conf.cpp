@@ -119,7 +119,8 @@ bool StoreConf::getString(const string& stringName,
   if (storeType.empty()
       || stringName == "type"
       || stringName == "category"
-      || stringName == "categories") {
+      || stringName == "categories"
+      || stringName == "num_store_threads") {
     return false;
   }
 

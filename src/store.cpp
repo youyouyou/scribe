@@ -82,34 +82,28 @@ bool shouldSendDummy(boost::shared_ptr<logentry_vector_t> messages) {
 boost::shared_ptr<Store>
 Store::createStore(StoreQueue* storeq, const string& type,
                    const string& category, bool readable,
-                   bool multi_category) {
+                   bool multi_category, const string& thread_name) {
   if (0 == type.compare("file")) {
     return shared_ptr<Store>(new FileStore(storeq, category, multi_category,
-                                          readable));
+                                          readable, thread_name));
   } else if (0 == type.compare("buffer")) {
-    return shared_ptr<Store>(new BufferStore(storeq,category, multi_category));
+    return shared_ptr<Store>(new BufferStore(storeq, category, multi_category, thread_name));
   } else if (0 == type.compare("network")) {
-    return shared_ptr<Store>(new NetworkStore(storeq, category,
-                                              multi_category));
+    return shared_ptr<Store>(new NetworkStore(storeq, category, multi_category));
   } else if (0 == type.compare("bucket")) {
-    return shared_ptr<Store>(new BucketStore(storeq, category,
-                                            multi_category));
+    return shared_ptr<Store>(new BucketStore(storeq, category, multi_category));
   } else if (0 == type.compare("thriftfile")) {
-    return shared_ptr<Store>(new ThriftFileStore(storeq, category,
-                                                multi_category));
+    return shared_ptr<Store>(new ThriftFileStore(storeq, category, multi_category));
   } else if (0 == type.compare("null")) {
     return shared_ptr<Store>(new NullStore(storeq, category, multi_category));
   } else if (0 == type.compare("multi")) {
     return shared_ptr<Store>(new MultiStore(storeq, category, multi_category));
   } else if (0 == type.compare("category")) {
-    return shared_ptr<Store>(new CategoryStore(storeq, category,
-                                              multi_category));
+    return shared_ptr<Store>(new CategoryStore(storeq, category, multi_category));
   } else if (0 == type.compare("multifile")) {
-    return shared_ptr<Store>(new MultiFileStore(storeq, category,
-                                                multi_category));
+    return shared_ptr<Store>(new MultiFileStore(storeq, category, multi_category));
   } else if (0 == type.compare("thriftmultifile")) {
-    return shared_ptr<Store>(new ThriftMultiFileStore(storeq, category,
-                                                      multi_category));
+    return shared_ptr<Store>(new ThriftMultiFileStore(storeq, category, multi_category));
   } else {
     return shared_ptr<Store>();
   }
@@ -118,8 +112,9 @@ Store::createStore(StoreQueue* storeq, const string& type,
 Store::Store(StoreQueue* storeq,
              const string& category,
              const string &type,
-             bool multi_category)
+             bool multi_category, const string& thread_name)
   : categoryHandled(category),
+    threadName(thread_name),
     multiCategory(multi_category),
     storeType(type),
     isPrimary(false),
@@ -201,8 +196,9 @@ void Store::auditMessagesSent(boost::shared_ptr<logentry_vector_t>& messages,
 
 FileStoreBase::FileStoreBase(StoreQueue* storeq,
                              const string& category,
-                             const string &type, bool multi_category)
-  : Store(storeq, category, type, multi_category),
+                             const string &type, bool multi_category,
+                             const string &thread_name)
+  : Store(storeq, category, type, multi_category, thread_name),
     baseFilePath("/tmp"),
     subDirectory(""),
     filePath("/tmp"),
@@ -250,6 +246,9 @@ void FileStoreBase::configure(pStoreConf configuration, pStoreConf parent) {
     filePath += "/" + subDirectory;
   }
 
+  if (!isPrimary &&  !threadName.empty()) {
+    filePath += "/" + threadName;
+  }
 
   if (!configuration->getString("base_filename", baseFileName)) {
     LOG_OPER(
@@ -383,6 +382,10 @@ void FileStoreBase::copyCommon(const FileStoreBase *base) {
   filePath = baseFilePath;
   if (!subDirectory.empty()) {
     filePath += "/" + subDirectory;
+  }
+
+  if (!isPrimary && !threadName.empty()) {
+    filePath += "/" + threadName;
   }
 
   baseFileName = categoryHandled;
@@ -622,6 +625,10 @@ void FileStoreBase::setHostNameSubDir() {
   } else {
     subDirectory = hoststring;
   }
+  // append threadName to the subdirectory
+  if (!threadName.empty()) {
+    subDirectory = hoststring + "_" + threadName;
+  }
 }
 
 void FileStoreBase::auditFileClosed() {
@@ -644,8 +651,9 @@ void FileStoreBase::auditFileClosed() {
 
 FileStore::FileStore(StoreQueue* storeq,
                      const string& category,
-                     bool multi_category, bool is_buffer_file)
-  : FileStoreBase(storeq, category, "file", multi_category),
+                     bool multi_category, bool is_buffer_file,
+                     const string &thread_name)
+  : FileStoreBase(storeq, category, "file", multi_category, thread_name),
     isBufferFile(is_buffer_file),
     addNewlines(false),
     encodeBase64Flag(false),
@@ -750,6 +758,10 @@ bool FileStore::openInternal(bool incrementFilename, struct tm* current_time) {
       success = writeFile->createDirectory(filePath);
     }
 
+    if (success && !isPrimary && !threadName.empty()) {
+      success = writeFile->createDirectory(filePath);
+    }
+
     if (!success) {
       LOG_OPER("[%s] Failed to create directory for file <%s>",
                categoryHandled.c_str(), file.c_str());
@@ -826,6 +838,12 @@ void FileStore::closeWriteFile() {
       // appended to scribe_stats when hdfs append works.
     }
     // update stats
+    if (!threadName.empty()) {
+      g_Handler->incCounter(categoryHandled + "_" + threadName,
+          fsType + "_wrote_num_messages", eventsWritten);
+      g_Handler->incCounter(categoryHandled + "_" + threadName,
+          fsType + "_wrote_bytes", eventSize);
+    }
     g_Handler->incCounter(categoryHandled, fsType + "_wrote_num_messages", eventsWritten);
     g_Handler->incCounter(categoryHandled, fsType + "_wrote_bytes", eventSize);
     
@@ -1353,8 +1371,9 @@ bool ThriftFileStore::createFileDirectory () {
 
 BufferStore::BufferStore(StoreQueue* storeq,
                         const string& category,
-                        bool multi_category)
-  : Store(storeq, category, "buffer", multi_category),
+                        bool multi_category,
+                        const string &thread_name)
+  : Store(storeq, category, "buffer", multi_category, thread_name),
     bufferSendRate(DEFAULT_BUFFERSTORE_SEND_RATE),
     avgRetryInterval(DEFAULT_BUFFERSTORE_AVG_RETRY_INTERVAL),
     retryIntervalRange(DEFAULT_BUFFERSTORE_RETRY_INTERVAL_RANGE),
@@ -1457,7 +1476,7 @@ void BufferStore::configure(pStoreConf configuration, pStoreConf parent) {
     } else {
       // If replayBuffer is true, then we need to create a readable store
       secondaryStore = createStore(storeQueue, type, categoryHandled,
-                                   replayBuffer, multiCategory);
+                                   replayBuffer, multiCategory, threadName);
       secondaryStore->configure(secondary_store_conf, storeConf);
     }
   }
@@ -1481,11 +1500,11 @@ void BufferStore::configure(pStoreConf configuration, pStoreConf parent) {
       setStatus(msg);
     } else {
       primaryStore = createStore(storeQueue, type, categoryHandled, false,
-                                  multiCategory);
-      primaryStore->configure(primary_store_conf, storeConf);
+                                  multiCategory, threadName);
       // set the primary flag for this store to true. This will be used later
-      // to decide whether to audit the sent messages. 
+      // to decide whether to audit the sent messages.
       primaryStore->setStorePrimary(true);
+      primaryStore->configure(primary_store_conf, storeConf);
       LOG_OPER("[%s] Store of type [%s] set to primary", categoryHandled.c_str(),
                type.c_str());
     }
@@ -1495,11 +1514,11 @@ void BufferStore::configure(pStoreConf configuration, pStoreConf parent) {
   // default location on local disk.
   if (!secondaryStore) {
     secondaryStore = createStore(storeQueue, "file", categoryHandled, true,
-                                multiCategory);
+                                multiCategory, threadName);
   }
   if (!primaryStore) {
     primaryStore = createStore(storeQueue, "file", categoryHandled, false,
-                               multiCategory);
+                               multiCategory, threadName);
   }
 }
 
@@ -3163,7 +3182,7 @@ void MultiFileStore::configure(pStoreConf configuration, pStoreConf parent) {
 
 ThriftMultiFileStore::ThriftMultiFileStore(StoreQueue* storeq,
                                           const std::string& category,
-                                           bool multi_category)
+                                          bool multi_category)
   : CategoryStore(storeq, category, "ThriftMultiFileStore", multi_category) {
 }
 
