@@ -522,8 +522,10 @@ void scribeHandler::addMessage(
 
   if (numstores) {
     incCounter(entry.category, "received good");
+    incCounter(entry.category, "received_good_bytes", entry.message.size());
   } else {
     incCounter(entry.category, "received bad");
+    incCounter(entry.category, "received_bad_bytes", entry.message.size());
   }
 }
 
