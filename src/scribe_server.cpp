@@ -389,6 +389,22 @@ bool scribeHandler::throttleRequest(const vector<LogEntry>&  messages) {
     return true;
   }
 
+  string category;
+  for (vector<LogEntry>::const_iterator msg_iter = messages.begin();
+       msg_iter != messages.end(); ++msg_iter) {
+    if ((*msg_iter).category.empty()) {
+      continue;
+    }
+    category = (*msg_iter).category;
+    break;
+  }
+
+  category_map_t::iterator cat_iter = categories.find(category);
+  shared_ptr<store_list_t> pstores;
+  if (cat_iter != categories.end()) {
+    pstores = cat_iter->second;
+  }
+
   // Throttle based on store queues getting too long.
   // Note that there's one decision for all categories, because the whole array passed to us
   // must either succeed or fail together. Checking before we've queued anything also has
@@ -397,25 +413,19 @@ bool scribeHandler::throttleRequest(const vector<LogEntry>&  messages) {
   // Also note that we always check all categories, not just the ones in this request.
   // This is a simplification based on the assumption that most Log() calls contain most
   // categories.
-  for (category_map_t::iterator cat_iter = categories.begin();
-       cat_iter != categories.end();
-       ++cat_iter) {
-    shared_ptr<store_list_t> pstores = cat_iter->second;
-    if (!pstores) {
-      throw std::logic_error("throttle check: iterator in category map holds null pointer");
-    }
-    for (store_list_t::iterator store_iter = pstores->begin();
-         store_iter != pstores->end();
-         ++store_iter) {
-      if (*store_iter == NULL) {
-        throw std::logic_error("throttle check: iterator in store map holds null pointer");
-      } else {
-        unsigned long long size = (*store_iter)->getSize();
-        if (size > maxQueueSize) {
-          LOG_OPER("throttle denying request for queue size <%llu>. It would exceed max queue size <%llu>", size, maxQueueSize);
-          incCounter((*store_iter)->getCategoryHandled(), "denied for queue size");
-          return true;
-        }
+  if (!pstores) {
+    throw std::logic_error("throttle check: iterator in category map holds null pointer");
+  }
+  for (store_list_t::iterator store_iter = pstores->begin();
+       store_iter != pstores->end(); ++store_iter) {
+    if (*store_iter == NULL) {
+      throw std::logic_error("throttle check: iterator in store map holds null pointer");
+    } else {
+      unsigned long long size = (*store_iter)->getSize();
+      if (size > maxQueueSize) {
+        LOG_OPER("throttle denying request for queue size <%llu>. It would exceed max queue size <%llu>", size, maxQueueSize);
+        incCounter((*store_iter)->getCategoryHandled(), "denied for queue size");
+        return true;
       }
     }
   }
