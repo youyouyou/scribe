@@ -422,14 +422,14 @@ bool scribeHandler::throttleRequest(const vector<LogEntry>&  messages) {
       throw std::logic_error("throttle check: iterator in store map holds null pointer");
     } else {
       unsigned long long size = (*store_iter)->getSize();
-      if (size > maxQueueSize) {
-        LOG_OPER("throttle denying request for queue size <%llu>. It would exceed max queue size <%llu>", size, maxQueueSize);
-        incCounter((*store_iter)->getCategoryHandled(), "denied for queue size");
-        return true;
+      if (size <= maxQueueSize) {
+        return false;
       }
     }
   }
-  return false;
+  LOG_OPER("throttle denying request for queue size <%llu>. It would exceed max queue size <%llu>", size, maxQueueSize);
+  incCounter(category, "denied for queue size");
+  return true;
 }
 
 // Should be called while holding a writeLock on scribeHandlerLock
