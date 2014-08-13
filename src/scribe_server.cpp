@@ -389,6 +389,17 @@ bool scribeHandler::throttleRequest(const vector<LogEntry>&  messages) {
     return true;
   }
 
+  // Throttle based on store queues getting too long.
+  // All messages in the batch are guaranteed to be belong to same stream.
+  // Note that there's one decision for all messages in the batch, because
+  // the whole array passed to us must either succeed or fail together.
+  // Checking before we've queued anything also has the nice property that
+  // any size array will succeed if we're unloaded before attempting it, so
+  // we won't hit a case where there's a client request that will never
+  // succeed. Also note that we always check the category which is present
+  // in this request. This is a simplification based on the assumption that
+  // Log() calls does not contains messages from multiple categories(i.e. single
+  // request does not contain messages from multiple categories)
   string category;
   for (vector<LogEntry>::const_iterator msg_iter = messages.begin();
        msg_iter != messages.end(); ++msg_iter) {
@@ -399,20 +410,15 @@ bool scribeHandler::throttleRequest(const vector<LogEntry>&  messages) {
     break;
   }
 
+  if (category.empty()) {
+    return false;
+  }
   category_map_t::iterator cat_iter = categories.find(category);
   shared_ptr<store_list_t> pstores;
   if (cat_iter != categories.end()) {
     pstores = cat_iter->second;
   }
 
-  // Throttle based on store queues getting too long.
-  // Note that there's one decision for all categories, because the whole array passed to us
-  // must either succeed or fail together. Checking before we've queued anything also has
-  // the nice property that any size array will succeed if we're unloaded before attempting
-  // it, so we won't hit a case where there's a client request that will never succeed.
-  // Also note that we always check all categories, not just the ones in this request.
-  // This is a simplification based on the assumption that most Log() calls contain most
-  // categories.
   if (!pstores) {
     throw std::logic_error("throttle check: iterator in category map holds null pointer");
   }
