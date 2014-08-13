@@ -410,6 +410,9 @@ bool scribeHandler::throttleRequest(const vector<LogEntry>&  messages) {
     break;
   }
 
+  if (category.empty()) {
+    return false;
+  }
   category_map_t::iterator cat_iter = categories.find(category);
   shared_ptr<store_list_t> pstores;
   if (cat_iter != categories.end()) {
