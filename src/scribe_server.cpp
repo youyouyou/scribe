@@ -422,6 +422,10 @@ bool scribeHandler::throttleRequest(const vector<LogEntry>&  messages) {
   if (!pstores) {
     throw std::logic_error("throttle check: iterator in category map holds null pointer");
   }
+
+  unsigned long long totalSize = 0;
+  int numQueues = 0;
+
   for (store_list_t::iterator store_iter = pstores->begin();
        store_iter != pstores->end(); ++store_iter) {
     if (*store_iter == NULL) {
@@ -431,10 +435,14 @@ bool scribeHandler::throttleRequest(const vector<LogEntry>&  messages) {
       if (size <= maxQueueSize) {
         return false;
       }
+      totalSize += size;
+      ++numQueues;
     }
   }
-  LOG_OPER("throttle denying request for queue size <%llu>. It would exceed max queue size <%llu>", size, maxQueueSize);
-  incCounter(category, "denied for queue size");
+  LOG_OPER("throttle denying request for queue size <%llu> with a batch of"
+    " <%d> messages for [%s] category. It would exceed max queue size <%llu>",
+    totalSize, messages.size(), category.c_str(), maxQueueSize * numQueues);
+  incCounter(category, "denied for queue size", messages.size());
   return true;
 }
 
