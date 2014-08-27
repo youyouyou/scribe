@@ -418,6 +418,7 @@ bool scribeHandler::throttleRequest(const vector<LogEntry>&  messages) {
   if (cat_iter != categories.end()) {
     pstores = cat_iter->second;
   } else {
+    LOG_OPER("No entry present in the category map  for [%s] category", category.c_str());
     return false;
   }
 
