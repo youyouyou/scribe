@@ -417,6 +417,8 @@ bool scribeHandler::throttleRequest(const vector<LogEntry>&  messages) {
   shared_ptr<store_list_t> pstores;
   if (cat_iter != categories.end()) {
     pstores = cat_iter->second;
+  } else {
+    return false;
   }
 
   if (!pstores) {
