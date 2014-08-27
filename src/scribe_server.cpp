@@ -417,6 +417,9 @@ bool scribeHandler::throttleRequest(const vector<LogEntry>&  messages) {
   shared_ptr<store_list_t> pstores;
   if (cat_iter != categories.end()) {
     pstores = cat_iter->second;
+  } else {
+    // No entry present in the category map for this category. Hence return false.
+    return false;
   }
 
   if (!pstores) {
@@ -936,6 +939,7 @@ bool scribeHandler::configureStore(pStoreConf store_conf, int *numstores) {
       shared_ptr<StoreQueue> result =
         configureStoreCategory(store_conf, category, model);
       if (result == NULL) {
+        LOG_OPER("Unable to create store queue for [%s] category", category.c_str());
         return false;
       }
     } else {
