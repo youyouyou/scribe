@@ -420,7 +420,8 @@ bool scribeHandler::throttleRequest(const vector<LogEntry>&  messages) {
   }
 
   if (!pstores) {
-    throw std::logic_error("throttle check: iterator in category map holds null pointer");
+    LOG_OPER("[%s] : throttle check: iterator in store map holds null pointer", category.c_str());
+    return false;
   }
 
   unsigned long long totalSize = 0;
@@ -936,6 +937,7 @@ bool scribeHandler::configureStore(pStoreConf store_conf, int *numstores) {
       shared_ptr<StoreQueue> result =
         configureStoreCategory(store_conf, category, model);
       if (result == NULL) {
+        LOG_OPER("Unable to create store queue for [%s] category", category.c_str());
         return false;
       }
     } else {
