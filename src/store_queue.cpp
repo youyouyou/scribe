@@ -38,7 +38,9 @@ void* threadStatic(void *this_ptr) {
 }
 
 StoreQueue::StoreQueue(const string& type, const string& category,
-                       unsigned check_period, bool is_model, bool multi_category)
+                       unsigned check_period,
+                       bool is_model, bool multi_category,
+                       const string& thread_name)
   : msgQueueSize(0),
     hasWork(false),
     stopping(false),
@@ -46,13 +48,14 @@ StoreQueue::StoreQueue(const string& type, const string& category,
     multiCategory(multi_category),
     categoryHandled(category),
     checkPeriod(check_period),
+    threadName(thread_name),
     targetWriteSize(DEFAULT_TARGET_WRITE_SIZE),
     maxWriteInterval(DEFAULT_MAX_WRITE_INTERVAL),
     mustSucceed(true),
     isAudit(false) {
 
   store = Store::createStore(this, type, category,
-                            false, multiCategory);
+                            false, multiCategory, thread_name);
   if (!store) {
     throw std::runtime_error("createStore failed in StoreQueue constructor. Invalid type?");
   }
@@ -186,6 +189,9 @@ std::string StoreQueue::getCategoryHandled() {
   return categoryHandled;
 }
 
+std::string StoreQueue::getThreadName() {
+  return threadName;
+}
 
 std::string StoreQueue::getStatus() {
   return store->getStatus();
