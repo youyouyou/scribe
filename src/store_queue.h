@@ -29,6 +29,7 @@
 class Store;
 class AuditManager;
 
+static const std::string empty_string = "";
 /*
  * This class implements a queue and a thread for dispatching
  * events to a store. It creates a store object of the requested
@@ -37,7 +38,9 @@ class AuditManager;
 class StoreQueue {
  public:
   StoreQueue(const std::string& type, const std::string& category,
-             unsigned check_period, bool is_model=false, bool multi_category=false);
+             unsigned check_period,
+             bool is_model=false, bool multi_category=false,
+             const std::string& thread_name = empty_string);
   StoreQueue(const boost::shared_ptr<StoreQueue> example,
              const std::string &category);
   virtual ~StoreQueue();
@@ -50,6 +53,7 @@ class StoreQueue {
   std::string getStatus(); // An empty string means OK, anything else is an error
   std::string getBaseType();
   std::string getCategoryHandled();
+  std::string getThreadName();
   bool isModelStore() { return isModel;}
 
   // this needs to be public for the thread creation to get to it,
@@ -122,6 +126,7 @@ class StoreQueue {
 
   // configuration
   std::string        categoryHandled;  // what category this store is handling
+  std::string        threadName;       // thread name
   time_t             checkPeriod;      // how often to call periodicCheck in seconds
   unsigned long long targetWriteSize;  // in bytes
   time_t             maxWriteInterval; // in seconds

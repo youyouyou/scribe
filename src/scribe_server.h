@@ -135,7 +135,8 @@ class scribeHandler : virtual public scribe::thrift::scribeIf,
     configureStoreCategory(pStoreConf store_conf,
                            const std::string &category,
                            const boost::shared_ptr<StoreQueue> &model,
-                           bool category_list=false);
+                           bool category_list=false,
+                           const std::string& thread_name = empty_string);
   bool configureStore(pStoreConf store_conf, int* num_stores);
   void stopStores();
   bool throttleRequest(const std::vector<scribe::thrift::LogEntry>&  messages);
@@ -143,7 +144,6 @@ class scribeHandler : virtual public scribe::thrift::scribeIf,
     createNewCategory(const std::string& category);
   void addMessage(const scribe::thrift::LogEntry& entry,
                   const boost::shared_ptr<store_list_t>& store_list);
-  
   void auditMessageReceived(const scribe::thrift::LogEntry& entry);
   void configureAuditManagerInAllStores();
 };

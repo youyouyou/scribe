@@ -44,7 +44,6 @@ enum roll_period_t {
   ROLL_OTHER
 };
 
-
 /*
  * Abstract class to define the interface for a store
  * and implement some basic functionality.
@@ -55,10 +54,12 @@ class Store {
   static boost::shared_ptr<Store>
     createStore(StoreQueue* storeq,
                 const std::string& type, const std::string& category,
-                bool readable = false, bool multi_category = false);
+                bool readable = false, bool multi_category = false,
+                const std::string& thread_name = empty_string);
 
   Store(StoreQueue* storeq, const std::string& category,
-        const std::string &type, bool multi_category = false);
+        const std::string &type, bool multi_category = false,
+        const std::string& thread_name = empty_string);
   virtual ~Store();
 
   virtual boost::shared_ptr<Store> copy(const std::string &category) = 0;
@@ -97,6 +98,7 @@ class Store {
         const std::string& filename);
   std::string status;
   std::string categoryHandled;
+  std::string threadName;
   bool multiCategory;             // Whether multiple categories are handled
   std::string storeType;
   // Whether this is a primary store of its parent. This flag is used to decide 
@@ -122,7 +124,8 @@ class FileStoreBase : public Store {
  public:
   FileStoreBase(StoreQueue* storeq,
                 const std::string& category,
-                const std::string &type, bool multi_category);
+                const std::string &type, bool multi_category,
+                const std::string& thread_name = empty_string);
   ~FileStoreBase();
 
   virtual void copyCommon(const FileStoreBase *base);
@@ -207,7 +210,8 @@ class FileStore : public FileStoreBase {
 
  public:
   FileStore(StoreQueue* storeq, const std::string& category,
-            bool multi_category, bool is_buffer_file = false);
+            bool multi_category, bool is_buffer_file = false,
+            const std::string& thread_name = empty_string);
   ~FileStore();
 
   boost::shared_ptr<Store> copy(const std::string &category);
@@ -300,7 +304,7 @@ class BufferStore : public Store {
  public:
   BufferStore(StoreQueue* storeq,
               const std::string& category,
-              bool multi_category);
+              bool multi_category, const std::string& thread_name = empty_string);
   ~BufferStore();
 
   boost::shared_ptr<Store> copy(const std::string &category);
