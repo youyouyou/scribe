@@ -1,3 +1,10 @@
+scribe-server-orig (0.6.0-trusty) trusty; urgency=low
+
+  * Build for Ubuntu -14.04
+  * removed auto make from configure
+
+ -- Platform Engineering <platform-engg@inmobi.com>  Thu, 23 Apr 2015 10:20:00  +0530
+ 
 scribe-server-orig (0.5.1-precise) precise; urgency=low
 
   * Add counters for received bytes
